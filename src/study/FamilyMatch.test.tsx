@@ -140,6 +140,26 @@ describe('family match screen', () => {
     expect(screen.queryByRole('button', { name: 'Back' })).toBeNull()
   })
 
+  it('keeps the space as a gap while typing a phrase', async () => {
+    const user = userEvent.setup()
+    const room = harness()
+    render(<FamilyMatch onBack={vi.fn()} connect={room.connect} />)
+    await user.click(screen.getByRole('button', { name: 'Ella' }))
+
+    const match = startMatch(sit(sit(emptyMatch(), 'Ella'), 'Mom'), ['a cappella'])
+    room.show(viewFor(match, 'Ella'))
+    const box = await screen.findByLabelText('Spell the word')
+
+    const slotsBefore = screen.getAllByTestId('letter-slot')
+    expect(slotsBefore[1]?.className).toMatch(/\bw-2\b/)
+
+    await user.type(box, 'a cappella')
+    const slots = screen.getAllByTestId('letter-slot')
+    expect(slots.map((slot) => slot.textContent)).toEqual(['a', '', 'c', 'a', 'p', 'p', 'e', 'l', 'l', 'a'])
+    expect(slots[1]?.className).toMatch(/\bw-2\b/)
+    expect(slots[1]?.className).not.toMatch(/\bborder\b/)
+  })
+
   it('does not count a short spelling and shows the letters from your own try', async () => {
     const user = userEvent.setup()
     const room = harness()

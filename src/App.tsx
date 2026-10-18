@@ -436,7 +436,7 @@ function App() {
                         data-testid="letter-slot"
                         aria-hidden="true"
                         className={
-                          character === ' ' && letter === ''
+                          character === ' ' && (letter === '' || letter === ' ')
                             ? 'mx-1 h-11 w-2 sm:h-12'
                             : `flex h-11 w-7 items-center justify-center rounded-md border bg-[#0e1210] text-lg font-bold text-stone-50 shadow-inner sm:h-12 sm:w-9 ${
                                 isNext

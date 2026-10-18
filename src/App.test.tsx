@@ -267,6 +267,29 @@ describe('spelling attempts', () => {
     ])
   })
 
+  it('keeps the space as a gap while typing a phrase', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Study a page' }))
+    await user.click(screen.getByRole('button', { name: 'Page 6' }))
+    await user.click(screen.getByRole('button', { name: 'Select words' }))
+    await user.click(screen.getByRole('button', { name: 'a cappella' }))
+    await user.click(screen.getByRole('button', { name: 'Play' }))
+
+    const slotsBefore = screen.getAllByTestId('letter-slot')
+    expect(slotsBefore).toHaveLength(10)
+    expect(slotsBefore[1]?.className).toMatch(/\bw-2\b/)
+    expect(slotsBefore[1]?.className).not.toMatch(/\bborder\b/)
+
+    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), 'a cappella')
+
+    const slots = screen.getAllByTestId('letter-slot')
+    expect(slots.map((slot) => slot.textContent)).toEqual(['a', '', 'c', 'a', 'p', 'p', 'e', 'l', 'l', 'a'])
+    expect(slots[1]?.className).toMatch(/\bw-2\b/)
+    expect(slots[1]?.className).not.toMatch(/\bborder\b/)
+  })
+
   it('turns a correct guess entirely green', async () => {
     const user = userEvent.setup()
     render(<App />)

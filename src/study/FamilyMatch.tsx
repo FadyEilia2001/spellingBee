@@ -552,7 +552,7 @@ function LetterBoxes({ word, draft }: { word: string; draft: string }) {
             data-testid="letter-slot"
             aria-hidden="true"
             className={
-              character === ' ' && letter === ''
+              character === ' ' && (letter === '' || letter === ' ')
                 ? 'mx-1 h-11 w-2'
                 : `flex h-11 w-7 items-center justify-center rounded-md border bg-[#0e1210] text-lg font-bold text-stone-50 sm:w-9 ${
                     isNext ? 'border-amber-300 ring-2 ring-amber-300/70' : 'border-amber-100/25'
