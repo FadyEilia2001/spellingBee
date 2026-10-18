@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Timer, Volume2 } from 'lucide-react'
 import { factsForWord } from '../data/wordFacts.ts'
 import { entryForWord } from '../data/words.ts'
@@ -35,6 +35,7 @@ export function BeeTurn({
   const [result, setResult] = useState<{ guess: string; solved: boolean } | null>(null)
   const [secondsLeft, setSecondsLeft] = useState(BEE_SECONDS)
   const [asked, setAsked] = useState<Ask[]>([])
+  const guessRef = useRef<HTMLInputElement>(null)
   const entry = entryForWord(word)
   const facts = factsForWord(word)
 
@@ -112,6 +113,7 @@ export function BeeTurn({
           </label>
           <input
             id="bee-guess"
+            ref={guessRef}
             value={draft}
             autoFocus
             autoCapitalize="none"
@@ -142,7 +144,10 @@ export function BeeTurn({
       <button
         type="button"
         className={`${touchTarget} mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-3 text-base font-semibold text-[#1c1406]`}
-        onClick={() => speakWord(word)}
+        onClick={() => {
+          speakWord(word)
+          guessRef.current?.focus()
+        }}
       >
         <Volume2 aria-hidden="true" />
         Say it again
@@ -154,7 +159,10 @@ export function BeeTurn({
             type="button"
             aria-pressed={asked.includes(ask.id)}
             className={`${touchTarget} rounded-2xl border border-amber-200/30 bg-amber-400/15 px-2 text-base font-semibold text-amber-100`}
-            onClick={() => setAsked((current) => (current.includes(ask.id) ? current : [...current, ask.id]))}
+            onClick={() => {
+              setAsked((current) => (current.includes(ask.id) ? current : [...current, ask.id]))
+              guessRef.current?.focus()
+            }}
           >
             {ask.label}
           </button>

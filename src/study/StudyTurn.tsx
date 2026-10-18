@@ -70,6 +70,8 @@ export function StudyTurn({
     const nowSolved = isSolvedGuess(guess, word)
     setAttempts(nextAttempts)
     setDraft('')
+    // Tapping Submit takes focus off the box; put it back so the keyboard stays up.
+    if (!nowSolved && nextAttempts.length < MAX_ATTEMPTS) guessRef.current?.focus()
 
     if (nowSolved) {
       playEffect('correct')
@@ -150,6 +152,7 @@ export function StudyTurn({
               id="spelling-guess"
               name="guess"
               value={draft}
+              autoFocus
               maxLength={characters.length}
               autoCapitalize="none"
               autoCorrect="off"
@@ -180,7 +183,10 @@ export function StudyTurn({
         <SentenceClue
           definition={entry.definition}
           sentence={maskSentence(entry.sentence, entry.word)}
-          onDismiss={() => setClueOpen(false)}
+          onDismiss={() => {
+            setClueOpen(false)
+            if (!locked) guessRef.current?.focus()
+          }}
         />
       ) : null}
 

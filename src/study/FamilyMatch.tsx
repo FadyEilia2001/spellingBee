@@ -213,6 +213,7 @@ export function FamilyMatch({
     if (!guess || locked || Array.from(guess).length !== Array.from(word).length) return
     send({ type: 'guess', guess })
     setDraft('')
+    guessRef.current?.focus()
   }
 
   function startGame() {
@@ -290,14 +291,20 @@ export function FamilyMatch({
               <button
                 type="button"
                 className={`${touchTarget} mt-4 w-full rounded-2xl bg-amber-400 px-3 text-lg font-semibold text-[#1c1406]`}
-                onClick={() => speakWord(word)}
+                onClick={() => {
+                  speakWord(word)
+                  guessRef.current?.focus()
+                }}
               >
                 Hear Word
               </button>
               <button
                 type="button"
                 className={`${touchTarget} mt-3 w-full rounded-2xl border border-amber-200/30 bg-amber-400/15 px-3 text-base font-semibold text-amber-100`}
-                onClick={() => setClueOpen(true)}
+                onClick={() => {
+                  setClueOpen(true)
+                  guessRef.current?.focus()
+                }}
               >
                 In a Sentence
               </button>
@@ -322,6 +329,7 @@ export function FamilyMatch({
                       ref={guessRef}
                       id="family-guess"
                       value={draft}
+                      autoFocus
                       maxLength={Array.from(word).length}
                       autoCapitalize="none"
                       autoCorrect="off"

@@ -354,6 +354,33 @@ describe('spelling attempts', () => {
   })
 })
 
+describe('typing box focus', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('keeps the box focused while the word is open and moves to Next when it is over', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
+    const box = () => screen.getByRole('textbox', { name: /spelling guess/i })
+    expect(document.activeElement).toBe(box())
+
+    await user.type(box(), 'xyz')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    expect(document.activeElement).toBe(box())
+
+    await user.click(screen.getByRole('button', { name: /in a sentence/i }))
+    await user.click(screen.getByRole('button', { name: /dismiss/i }))
+    expect(document.activeElement).toBe(box())
+
+    await user.type(box(), currentRound().current ?? '')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /next word/i }))
+
+    await user.click(screen.getByRole('button', { name: /next word/i }))
+    expect(document.activeElement).toBe(box())
+  })
+})
+
 describe('saved study rounds', () => {
   beforeEach(() => {
     localStorage.clear()

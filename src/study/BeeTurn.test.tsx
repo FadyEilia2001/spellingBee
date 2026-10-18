@@ -38,6 +38,7 @@ describe('Bee mode turn', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Origin' }))
     expect(screen.getByTestId('bee-partOfSpeech').textContent).toBe('noun')
     expect(screen.getByTestId('bee-origin').textContent).toBe('Dutch, through French')
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: /spell it/i }))
   })
 
   it('never takes a letter back and gives one try', () => {
