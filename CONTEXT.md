@@ -1,6 +1,6 @@
 # Spelling study
 
-A practice app where a child spells words from a fixed study list, either in a sized round or on a single page.
+A practice app where a child spells words from a fixed study list, either in a sized round, on a single page, or as a word pick from one page.
 
 ## Language
 
@@ -23,6 +23,10 @@ _Avoid_: session, deck
 **Page lesson**:
 A study of one whole page, in that page's order, which continues until every word on the page has a clean spelling.
 _Avoid_: round
+
+**Word pick**:
+A lesson of the words she highlighted on one page, kept in that page's order, which continues until every highlighted word has a clean spelling.
+_Avoid_: custom quiz, partial page, trunk
 
 **Clean spelling**:
 Spelling the word correctly on the first try of its current turn.
