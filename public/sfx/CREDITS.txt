@@ -1,0 +1,17 @@
+Title: confirmation_001
+Author: Kenney (www.kenney.nl)
+License: CC0 1.0 Universal
+Source: https://kenney.nl/assets/interface-sounds
+Used as: correct.mp3
+
+Title: drop_001
+Author: Kenney (www.kenney.nl)
+License: CC0 1.0 Universal
+Source: https://kenney.nl/assets/interface-sounds
+Used as: miss.mp3
+
+Title: jingles_NES12
+Author: Kenney (www.kenney.nl)
+License: CC0 1.0 Universal
+Source: https://kenney.nl/assets/music-jingles
+Used as: complete.mp3

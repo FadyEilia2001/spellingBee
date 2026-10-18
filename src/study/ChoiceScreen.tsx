@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { StudyPageId } from '../data/pages.ts'
 import { STUDY_PAGES } from '../data/pages.ts'
 import {
@@ -7,6 +7,8 @@ import {
   type Difficulty,
   type RoundCount,
 } from './difficulty.ts'
+import { type LineId } from './lines.ts'
+import { playLine } from './soundtrack.ts'
 
 const touchTarget =
   'min-h-[52px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200'
@@ -15,6 +17,13 @@ const prompt = 'text-center text-xl font-semibold leading-snug text-stone-50'
 const choiceButton = `${touchTarget} w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-lg font-semibold text-stone-100`
 
 type Step = 'adventure' | 'page' | 'difficulty' | 'count'
+
+const LINE_FOR_STEP: Record<Step, LineId> = {
+  adventure: 'adventure',
+  page: 'page',
+  difficulty: 'difficulty',
+  count: 'count',
+}
 
 export function ChoiceScreen({
   onStartRound,
@@ -26,11 +35,17 @@ export function ChoiceScreen({
   const [step, setStep] = useState<Step>('adventure')
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null)
 
+  useEffect(() => {
+    if (step === 'count' && difficulty === null) return
+    playLine(LINE_FOR_STEP[step])
+  }, [step, difficulty])
+
   return (
     <div className="mt-8">
       {step === 'adventure' ? (
         <>
-          <p className={prompt}>Hi Ella, choose your adventure</p>
+          <p className={prompt}>Hi Ella, choose your adventure.</p>
+          <p className={`${prompt} mt-2`}>You can study a page or embark on a quiz.</p>
           <div className="mt-4 grid gap-3">
             <button type="button" className={choiceButton} onClick={() => setStep('page')}>
               Study a page
@@ -44,7 +59,7 @@ export function ChoiceScreen({
 
       {step === 'page' ? (
         <>
-          <p className={prompt}>Please select which page you want to study.</p>
+          <p className={prompt}>Select which page you would like to study.</p>
           <div className="mt-4 grid gap-3">
             {STUDY_PAGES.map((page) => (
               <button
@@ -63,7 +78,7 @@ export function ChoiceScreen({
 
       {step === 'difficulty' ? (
         <>
-          <p className={prompt}>Please select the difficulty.</p>
+          <p className={prompt}>Please select the difficulty of your quiz.</p>
           <div className="mt-4 grid grid-cols-3 gap-3">
             {DIFFICULTIES.map((item) => (
               <button
@@ -87,7 +102,7 @@ export function ChoiceScreen({
 
       {step === 'count' && difficulty !== null ? (
         <>
-          <p className={prompt}>Please select how many words.</p>
+          <p className={prompt}>How many words would you like?</p>
           <div className="mt-4 grid grid-cols-3 gap-3">
             {ROUND_COUNTS.map((count) => (
               <button

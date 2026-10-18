@@ -1,6 +1,6 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import confetti from 'canvas-confetti'
-import { ChevronRight, Flame, Star, Volume2 } from 'lucide-react'
+import { ChevronRight, Flame, Star, Volume2, VolumeX } from 'lucide-react'
 import { ALL_SPELLING_WORDS, entryForWord } from './data/words.ts'
 import { wordsForPage } from './data/pages.ts'
 import {
@@ -30,6 +30,8 @@ import {
 } from './study/queue.ts'
 import { maskSentence } from './study/sentenceClue.ts'
 import { speakWord, stopSpeaking } from './study/speech.ts'
+import { readMusicPreference } from './study/lines.ts'
+import { playEffect, playLine, pauseTune, resumeTune, startTune } from './study/soundtrack.ts'
 import { slotCount } from './study/wordCycling.ts'
 
 type Attempt = {
@@ -113,6 +115,7 @@ function App() {
   const [draft, setDraft] = useState('')
   const [summary, setSummary] = useState<SessionSummary | null>(null)
   const [sessionStars, setSessionStars] = useState(0)
+  const [music, setMusic] = useState(readMusicPreference)
   const [clueOpen, setClueOpen] = useState(false)
   const guessRef = useRef<HTMLInputElement>(null)
 
@@ -124,6 +127,16 @@ function App() {
   const entry = entryForWord(word)
   const pendingClean = queue !== null && recorded && turnIsClean(attempts, word)
   const shownClean = (queue ? cleanCount(queue) : 0) + (pendingClean ? 1 : 0)
+
+  useEffect(() => {
+    startTune()
+  }, [])
+
+  useEffect(() => {
+    if (!summary) return
+    playEffect('complete')
+    playLine('finished')
+  }, [summary])
 
   function openSession(nextQueue: StudyQueue) {
     if (nextQueue.current === null) return
@@ -164,7 +177,13 @@ function App() {
       setProgress(nextProgress)
       setSessionStars((current) => current + starsFor(nextAttempts.length, nowSolved))
       setRecorded(true)
-      if (!nowSolved) speakWord(word)
+      if (nowSolved) {
+        playEffect('correct')
+        playLine('yes')
+      } else {
+        playEffect('miss')
+        speakWord(word)
+      }
     }
   }
 
@@ -230,6 +249,22 @@ function App() {
               <span data-testid="total-stars">{progress.totalStars}</span>
               <span className="font-medium text-stone-400">stars</span>
             </p>
+            <button
+              type="button"
+              aria-label={music === 'playing' ? 'Pause music' : 'Play music'}
+              className={`${touchTarget} rounded-2xl border border-white/10 px-3 text-sm font-semibold text-stone-200`}
+              onClick={() => {
+                if (music === 'playing') {
+                  pauseTune()
+                  setMusic('paused')
+                } else {
+                  resumeTune()
+                  setMusic('playing')
+                }
+              }}
+            >
+              {music === 'playing' ? <Volume2 aria-hidden="true" size={18} /> : <VolumeX aria-hidden="true" size={18} />}
+            </button>
             <p className="flex items-center gap-2 text-orange-300">
               <Flame
                 aria-hidden="true"

@@ -3,11 +3,20 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ChoiceScreen } from './ChoiceScreen.tsx'
 
+const playLine = vi.fn()
+
+vi.mock('./soundtrack.ts', () => ({
+  playLine: (...args: unknown[]) => playLine(...args),
+}))
+
 describe('choice screen', () => {
   it('asks Ella to choose an adventure before pages or a quiz', () => {
+    playLine.mockClear()
     render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} />)
 
-    expect(screen.getByText('Hi Ella, choose your adventure')).toBeTruthy()
+    expect(screen.getByText('Hi Ella, choose your adventure.')).toBeTruthy()
+    expect(screen.getByText('You can study a page or embark on a quiz.')).toBeTruthy()
+    expect(playLine).toHaveBeenCalledWith('adventure')
     expect(screen.getByRole('button', { name: 'Study a page' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Quiz' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Page 1' })).toBeNull()
@@ -25,7 +34,8 @@ describe('choice screen', () => {
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
 
-    expect(screen.getByText('Please select which page you want to study.')).toBeTruthy()
+    expect(screen.getByText('Select which page you would like to study.')).toBeTruthy()
+    expect(playLine).toHaveBeenCalledWith('page')
     expect(screen.queryByRole('button', { name: 'Quiz' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Page 2' }))
 
@@ -40,11 +50,13 @@ describe('choice screen', () => {
 
     await user.click(screen.getByRole('button', { name: 'Quiz' }))
 
-    expect(screen.getByText('Please select the difficulty.')).toBeTruthy()
+    expect(screen.getByText('Please select the difficulty of your quiz.')).toBeTruthy()
+    expect(playLine).toHaveBeenCalledWith('difficulty')
     expect(screen.queryByRole('button', { name: '5 words' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Short' }))
 
-    expect(screen.getByText('Please select how many words.')).toBeTruthy()
+    expect(screen.getByText('How many words would you like?')).toBeTruthy()
+    expect(playLine).toHaveBeenCalledWith('count')
     expect(onStartRound).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: '5 words' }))
 
@@ -64,7 +76,8 @@ describe('choice screen', () => {
     await user.click(screen.getByRole('button', { name: 'Quiz' }))
     await user.click(screen.getByRole('button', { name: 'Short' }))
     await user.click(screen.getByRole('button', { name: 'Back' }))
-    expect(screen.getByText('Please select the difficulty.')).toBeTruthy()
+    expect(screen.getByText('Please select the difficulty of your quiz.')).toBeTruthy()
+    expect(playLine).toHaveBeenLastCalledWith('difficulty')
     await user.click(screen.getByRole('button', { name: 'Long' }))
     await user.click(screen.getByRole('button', { name: '10 words' }))
 

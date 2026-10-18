@@ -10,10 +10,10 @@ The terms in `CONTEXT.md` are the ones this spec uses: difficulty, page, round, 
 
 The app opens on a choice screen. It does not start a round by itself. Each choice is its own screen, and she can go back to the previous screen.
 
-1. “Hi Ella, choose your adventure.” She picks Study a page or Quiz.
-2. Study a page asks which page, then starts that page lesson.
-3. Quiz asks for a difficulty: Short (3–5 letters), Medium (6–8 letters), or Long (9 or more letters).
-4. Quiz then asks how many different words: 5, 10, or 15. That choice starts the round. Those words are shuffled from that difficulty and no others.
+1. “Hi Ella, choose your adventure. You can study a page or embark on a quiz.” She picks Study a page or Quiz.
+2. Study a page says “Select which page you would like to study.”, then starts that page lesson.
+3. Quiz says “Please select the difficulty of your quiz.” Short is 3–5 letters, Medium is 6–8 letters, and Long is 9 or more letters.
+4. Quiz then says “How many words would you like?” She picks 5, 10, or 15. That choice starts the round. Those words are shuffled from that difficulty and no others.
 
 **Study a page**
 

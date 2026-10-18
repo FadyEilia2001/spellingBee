@@ -15,6 +15,7 @@ function currentRound(): StudyQueue {
 
 beforeEach(() => {
   Math.random = () => 0
+  musicPreference = 'playing'
 })
 
 afterEach(() => {
@@ -23,10 +24,33 @@ afterEach(() => {
 
 const speakWord = vi.fn()
 const stopSpeaking = vi.fn()
+const playLine = vi.fn()
+const playEffect = vi.fn()
+const pauseTune = vi.fn()
+const resumeTune = vi.fn()
+const startTune = vi.fn()
+let musicPreference: 'playing' | 'paused' = 'playing'
 
 vi.mock('./study/speech.ts', () => ({
   speakWord: (...args: unknown[]) => speakWord(...args),
   stopSpeaking: (...args: unknown[]) => stopSpeaking(...args),
+}))
+
+vi.mock('./study/soundtrack.ts', () => ({
+  playLine: (...args: unknown[]) => playLine(...args),
+  playEffect: (...args: unknown[]) => playEffect(...args),
+  pauseTune: () => {
+    musicPreference = 'paused'
+    localStorage.setItem('spellingBee.music', 'paused')
+    pauseTune()
+  },
+  resumeTune: () => {
+    musicPreference = 'playing'
+    localStorage.setItem('spellingBee.music', 'playing')
+    resumeTune()
+  },
+  startTune: (...args: unknown[]) => startTune(...args),
+  readMusicPreference: () => musicPreference,
 }))
 
 vi.mock('canvas-confetti', () => ({
@@ -46,10 +70,19 @@ describe('choice screen', () => {
     stopSpeaking.mockClear()
   })
 
-  it('opens on the choices and does not speak', () => {
-    render(<App />)
+  it('opens on the choices and does not speak', async () => {
+    const user = userEvent.setup()
+    const first = render(<App />)
 
-    expect(screen.getByText('Hi Ella, choose your adventure')).toBeTruthy()
+    expect(screen.getByText('Hi Ella, choose your adventure.')).toBeTruthy()
+    expect(startTune).toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Pause music' }))
+    expect(pauseTune).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Play music' })).toBeTruthy()
+
+    first.unmount()
+    render(<App />)
+    expect(screen.getByRole('button', { name: 'Play music' })).toBeTruthy()
     expect(screen.queryByRole('textbox', { name: /spelling guess/i })).toBeNull()
     expect(speakWord).not.toHaveBeenCalled()
   })
@@ -176,6 +209,9 @@ describe('spelling attempts', () => {
     const tiles = screen.getAllByTestId('attempt-tile')
     expect(tiles.map((tile) => tile.textContent)).toEqual(Array.from(word))
     expect(tiles.every((tile) => tile.dataset.status === 'correct')).toBe(true)
+    expect(playEffect).toHaveBeenCalledWith('correct')
+    expect(playLine).toHaveBeenCalledWith('yes')
+    expect(speakWord).not.toHaveBeenCalled()
   })
 
   it('uses an 18px input and reveals the word after three misses', async () => {
@@ -244,7 +280,7 @@ describe('saved study rounds', () => {
     first.unmount()
     render(<App />)
 
-    expect(screen.getByText('Hi Ella, choose your adventure')).toBeTruthy()
+    expect(screen.getByText('Hi Ella, choose your adventure.')).toBeTruthy()
     expect(screen.getByTestId('total-stars').textContent).toBe('3')
     expect(screen.getByTestId('current-streak').textContent).toBe('1')
   })
@@ -261,6 +297,8 @@ describe('saved study rounds', () => {
       await user.click(screen.getByRole('button', { name: /^submit$/i }))
     }
     expect(screen.getByTestId('revealed-word').textContent).toBe(missed)
+    expect(playEffect).toHaveBeenCalledWith('miss')
+    expect(speakWord).toHaveBeenCalledWith(missed)
 
     let queue = finishTurn(currentRound(), false)
     await user.click(screen.getByRole('button', { name: /next word/i }))
@@ -309,9 +347,11 @@ describe('saved study rounds', () => {
     expect(screen.getByTestId('clean-later').textContent).toMatch(/0/)
     expect(screen.getByTestId('set-aside').textContent).toMatch(/0/)
     expect(screen.queryByRole('button', { name: /review missed words/i })).toBeNull()
+    expect(playEffect).toHaveBeenCalledWith('complete')
+    expect(playLine).toHaveBeenCalledWith('finished')
 
     await user.click(screen.getByRole('button', { name: /back to study choices/i }))
     expect(screen.queryByTestId('round-summary')).toBeNull()
-    expect(screen.getByText('Hi Ella, choose your adventure')).toBeTruthy()
+    expect(screen.getByText('Hi Ella, choose your adventure.')).toBeTruthy()
   })
 })
