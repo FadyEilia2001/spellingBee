@@ -29,10 +29,12 @@ export function ChoiceScreen({
   onStartRound,
   onStartPage,
   onStartPick,
+  onPlayFamily,
 }: {
   onStartRound: (difficulty: Difficulty, count: RoundCount) => void
   onStartPage: (pageId: StudyPageId) => void
   onStartPick: (words: string[]) => void
+  onPlayFamily: () => void
 }) {
   const [step, setStep] = useState<Step>('adventure')
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null)
@@ -45,6 +47,7 @@ export function ChoiceScreen({
     }
     if (step === 'count' && difficulty === null) return
     playLine(LINE_FOR_STEP[step])
+    return () => stopLine()
   }, [step, difficulty])
 
   return (
@@ -59,6 +62,9 @@ export function ChoiceScreen({
             </button>
             <button type="button" className={choiceButton} onClick={() => setStep('difficulty')}>
               Quiz
+            </button>
+            <button type="button" className={choiceButton} onClick={onPlayFamily}>
+              Play with mom/dad
             </button>
           </div>
         </>

@@ -11,6 +11,8 @@ import {
 } from './study/evaluateGuess.ts'
 import { wordsForDifficulty, type Difficulty, type RoundCount } from './study/difficulty.ts'
 import { ChoiceScreen } from './study/ChoiceScreen.tsx'
+import { connectFamilyRoom, FamilyMatch } from './study/FamilyMatch.tsx'
+import { roomHasCompany } from './study/duel.ts'
 import {
   appendRoundHistory,
   loadProgress,
@@ -36,6 +38,7 @@ import {
   playLine,
   pauseTune,
   resumeTune,
+  hushSoundtrack,
   startTune,
   stopLine,
 } from './study/soundtrack.ts'
@@ -125,7 +128,33 @@ function App() {
   const [music, setMusic] = useState(readMusicPreference)
   const [clueOpen, setClueOpen] = useState(false)
   const [pageLesson, setPageLesson] = useState(false)
+  const [family, setFamily] = useState(false)
+  const [joining, setJoining] = useState(false)
+  const [roomReady, setRoomReady] = useState(import.meta.env.MODE === 'test')
+  const hostRef = useRef(false)
+  const queueRef = useRef<StudyQueue | null>(null)
   const guessRef = useRef<HTMLInputElement>(null)
+
+  queueRef.current = queue
+
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test') return
+    const timer = window.setTimeout(() => setRoomReady(true), 2000)
+    const room = connectFamilyRoom((next) => {
+      window.clearTimeout(timer)
+      setRoomReady(true)
+      if (hostRef.current || queueRef.current) return
+      const company = roomHasCompany(next)
+      if (company) hushSoundtrack()
+      setJoining(company)
+    }, (open) => {
+      if (!open) setRoomReady(true)
+    })
+    return () => {
+      window.clearTimeout(timer)
+      room.close()
+    }
+  }, [])
 
   const word = queue?.current ?? ''
   const characters = Array.from(word)
@@ -505,11 +534,30 @@ function App() {
             </button>
           </>
         ) : (
-          <ChoiceScreen
-            onStartRound={startDifficultyRound}
-            onStartPage={(pageId) => openSession(startQueue(wordsForPage(pageId)), true)}
-            onStartPick={(words) => openSession(startQueue(words), true)}
-          />
+          !roomReady ? (
+            <p className="mt-8 text-center text-lg text-stone-300">One moment</p>
+          ) : family || joining ? (
+            <FamilyMatch
+              host={family && !joining}
+              onBack={() => {
+                hostRef.current = false
+                setFamily(false)
+              }}
+            />
+          ) : (
+            <ChoiceScreen
+              onStartRound={startDifficultyRound}
+              onStartPage={(pageId) => openSession(startQueue(wordsForPage(pageId)), true)}
+              onStartPick={(words) => openSession(startQueue(words), true)}
+              onPlayFamily={() => {
+                stopSpeaking()
+                hushSoundtrack()
+                hostRef.current = true
+                setJoining(false)
+                setFamily(true)
+              }}
+            />
+          )
         )}
       </section>
     </main>

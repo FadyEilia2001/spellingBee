@@ -16,13 +16,14 @@ vi.mock('./soundtrack.ts', () => ({
 describe('choice screen', () => {
   it('asks Ella to choose an adventure before pages or a quiz', () => {
     playLine.mockClear()
-    render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={vi.fn()} />)
+    render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={vi.fn()} onPlayFamily={vi.fn()} />)
 
     expect(screen.getByText('Hi Ella, choose your adventure.')).toBeTruthy()
     expect(screen.getByText('You can study a page or embark on a quiz.')).toBeTruthy()
     expect(playLine).toHaveBeenCalledWith('adventure')
     expect(screen.getByRole('button', { name: 'Study a page' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Quiz' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Play with mom/dad' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Page 1' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Short' })).toBeNull()
     for (const button of screen.getAllByRole('button')) {
@@ -36,7 +37,7 @@ describe('choice screen', () => {
     const onStartPage = vi.fn()
     const onStartPick = vi.fn()
     render(
-      <ChoiceScreen onStartRound={onStartRound} onStartPage={onStartPage} onStartPick={onStartPick} />,
+      <ChoiceScreen onStartRound={onStartRound} onStartPage={onStartPage} onStartPick={onStartPick} onPlayFamily={vi.fn()} />,
     )
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
@@ -60,7 +61,7 @@ describe('choice screen', () => {
 
   it('returns to the page list and plays the page line', async () => {
     const user = userEvent.setup()
-    render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={vi.fn()} />)
+    render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={vi.fn()} onPlayFamily={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
     await user.click(screen.getByRole('button', { name: 'Page 2' }))
@@ -74,7 +75,7 @@ describe('choice screen', () => {
   it('lists that page in order and plays the highlighted words', async () => {
     const user = userEvent.setup()
     const onStartPick = vi.fn()
-    render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={onStartPick} />)
+    render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={onStartPick} onPlayFamily={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
     await user.click(screen.getByRole('button', { name: 'Page 2' }))
@@ -101,7 +102,7 @@ describe('choice screen', () => {
   it('clears highlights when she leaves the word list', async () => {
     const user = userEvent.setup()
     const onStartPick = vi.fn()
-    render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={onStartPick} />)
+    render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={onStartPick} onPlayFamily={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
     await user.click(screen.getByRole('button', { name: 'Page 2' }))
@@ -120,7 +121,7 @@ describe('choice screen', () => {
   it('starts a quiz only after a difficulty and a word count', async () => {
     const user = userEvent.setup()
     const onStartRound = vi.fn()
-    render(<ChoiceScreen onStartRound={onStartRound} onStartPage={vi.fn()} onStartPick={vi.fn()} />)
+    render(<ChoiceScreen onStartRound={onStartRound} onStartPage={vi.fn()} onStartPick={vi.fn()} onPlayFamily={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Quiz' }))
 
@@ -142,7 +143,7 @@ describe('choice screen', () => {
     const onStartRound = vi.fn()
     const onStartPage = vi.fn()
     render(
-      <ChoiceScreen onStartRound={onStartRound} onStartPage={onStartPage} onStartPick={vi.fn()} />,
+      <ChoiceScreen onStartRound={onStartRound} onStartPage={onStartPage} onStartPick={vi.fn()} onPlayFamily={vi.fn()} />,
     )
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))

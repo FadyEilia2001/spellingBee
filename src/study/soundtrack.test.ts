@@ -3,10 +3,12 @@ import { DUCKED_VOLUME, EFFECT_VOLUME, LINE_VOLUME, TUNE_VOLUME } from './lines.
 import {
   duckTune,
   pauseTune,
+  hushSoundtrack,
   playEffect,
   playLine,
   playTick,
   resetSoundtrack,
+  restoreSoundtrack,
   resumeTune,
   startTune,
   stopLine,
@@ -223,6 +225,27 @@ describe('soundtrack', () => {
     await Promise.resolve()
 
     expect(FakeAudio.instances.filter((audio) => audio.src.includes('adventure'))).toHaveLength(1)
+  })
+
+  it('goes quiet for a family match and brings the music back afterward', async () => {
+    startTune()
+    await Promise.resolve()
+    playLine('adventure', mockSynth())
+    await Promise.resolve()
+
+    hushSoundtrack()
+    const tune = FakeAudio.instances[0]
+    const line = FakeAudio.instances[1]
+    expect(tune?.paused).toBe(true)
+    expect(line?.paused).toBe(true)
+
+    playLine('yes', mockSynth())
+    playEffect('correct')
+    expect(FakeAudio.instances).toHaveLength(2)
+
+    restoreSoundtrack()
+    await Promise.resolve()
+    expect(tune?.paused).toBe(false)
   })
 
   it('stops the current line', async () => {

@@ -23,6 +23,7 @@ let pendingLine: LineId | null = null
 let unlockArmed = false
 let unlockSynth: SpeechSynthesis | null = null
 let tuneRequest = 0
+let hushed = false
 
 function applyTuneVolume(): void {
   if (!tune) return
@@ -65,6 +66,24 @@ function ensureTune(): HTMLAudioElement {
   return tune
 }
 
+export function hushSoundtrack(): void {
+  hushed = true
+  stopLine()
+  tuneRequest += 1
+  if (tune) tune.pause()
+  try {
+    window.speechSynthesis?.cancel()
+  } catch {
+    // No spoken line to cut off.
+  }
+}
+
+export function restoreSoundtrack(): void {
+  if (!hushed) return
+  hushed = false
+  playTune()
+}
+
 export function stopLine(): void {
   if (lineAudio) {
     lineAudio.pause()
@@ -103,6 +122,7 @@ function armUnlock(synth: SpeechSynthesis): void {
 }
 
 export function playLine(id: LineId, synth: SpeechSynthesis = window.speechSynthesis): void {
+  if (hushed) return
   if (pendingLine === id && lineAudio) return
   stopLine()
   pendingLine = id
@@ -151,6 +171,7 @@ export function playLine(id: LineId, synth: SpeechSynthesis = window.speechSynth
 }
 
 export function playTick(on: boolean): void {
+  if (hushed) return
   try {
     const Context =
       window.AudioContext ??
@@ -177,6 +198,7 @@ export function playTick(on: boolean): void {
 }
 
 export function playEffect(id: EffectId): void {
+  if (hushed) return
   try {
     const audio = new Audio(EFFECTS[id])
     audio.volume = EFFECT_VOLUME
@@ -187,7 +209,7 @@ export function playEffect(id: EffectId): void {
 }
 
 function playTune(): void {
-  if (readMusicPreference() === 'paused') return
+  if (hushed || readMusicPreference() === 'paused') return
   const audio = ensureTune()
   audio.muted = false
   const request = ++tuneRequest
@@ -222,6 +244,7 @@ export function resumeTune(): void {
 }
 
 export function resetSoundtrack(): void {
+  hushed = false
   stopLine()
   tickContext = null
   if (tune) {

@@ -53,6 +53,8 @@ vi.mock('./study/soundtrack.ts', () => ({
     resumeTune()
   },
   startTune: (...args: unknown[]) => startTune(...args),
+  hushSoundtrack: vi.fn(),
+  restoreSoundtrack: vi.fn(),
   readMusicPreference: () => musicPreference,
 }))
 
