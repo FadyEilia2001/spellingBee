@@ -541,6 +541,21 @@ describe('page a day', () => {
     expect(screen.getByText('Page 1 · Words 11–20')).toBeTruthy()
   })
 
+  it('marks finished sets, the set up next, and how far along the others are', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem(
+      'spellingBee.words',
+      JSON.stringify({ learned: [...page1.slice(0, 10), ...page1.slice(20, 26)], practice: [] }),
+    )
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Study a page' }))
+    await user.click(screen.getByRole('button', { name: /^Page 1\b/ }))
+
+    expect(screen.getByTestId('set-0').getAttribute('aria-label')).toBe('Words 1–10, done')
+    expect(screen.getByTestId('set-1').getAttribute('aria-label')).toBe('Words 11–20, 0 of 10 learned, up next')
+    expect(screen.getByTestId('set-2').textContent).toBe('Words 21–306/10')
+  })
+
   it('finishes the page with the page test and moves today to the next page', async () => {
     const user = userEvent.setup()
     localStorage.setItem('spellingBee.words', JSON.stringify({ learned: page1, practice: [] }))

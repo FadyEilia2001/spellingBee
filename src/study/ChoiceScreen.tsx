@@ -184,17 +184,32 @@ export function ChoiceScreen({
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {setsOf(wordsForPage(pageId)).map((set, index) => {
               const first = index * SET_SIZE + 1
-              const finished = set.every((word) => learned.has(word))
+              const known = set.filter((word) => learned.has(word)).length
+              const finished = known === set.length
+              const upNext = index === scopeStatus.nextSet
               return (
                 <button
                   key={first}
                   type="button"
-                  className={`${touchTarget} rounded-2xl border px-2 text-base font-semibold ${
-                    finished ? 'border-green-400/50 bg-green-500/15 text-green-200' : 'border-white/10 bg-white/5 text-stone-100'
+                  data-testid={`set-${index}`}
+                  aria-label={`Words ${first}–${first + set.length - 1}, ${
+                    finished ? 'done' : `${known} of ${set.length} learned${upNext ? ', up next' : ''}`
+                  }`}
+                  className={`${touchTarget} rounded-2xl border px-2 py-2 text-base font-semibold ${
+                    finished
+                      ? 'border-green-400/50 bg-green-500/15 text-green-200'
+                      : upNext
+                        ? 'border-amber-300 bg-amber-400 text-[#1c1406]'
+                        : 'border-white/10 bg-white/5 text-stone-100'
                   }`}
                   onClick={() => onStartPage(pageId, index)}
                 >
                   {finished ? '✓ ' : ''}Words {first}–{first + set.length - 1}
+                  {finished ? null : (
+                    <span className={`block text-xs font-medium ${upNext ? '' : 'text-stone-400'}`}>
+                      {upNext ? `Up next · ${known}/${set.length}` : `${known}/${set.length}`}
+                    </span>
+                  )}
                 </button>
               )
             })}
