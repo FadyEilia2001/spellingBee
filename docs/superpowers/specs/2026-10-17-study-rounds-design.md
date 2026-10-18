@@ -8,26 +8,25 @@ The terms in `CONTEXT.md` are the ones this spec uses: difficulty, page, round, 
 
 ## How a study starts
 
-The app opens on a choice screen. It does not start a round by itself.
+The app opens on a choice screen. It does not start a round by itself. Each choice is its own screen, and she can go back to the previous screen.
 
-**Practice a round**
-
-1. She picks a difficulty: Short (3–5 letters), Medium (6–8 letters), or Long (9 or more letters).
-2. She picks how many different words: 5, 10, or 15.
-3. Those words are shuffled from that difficulty and no others.
+1. “Hi Ella, choose your adventure.” She picks Study a page or Quiz.
+2. Study a page asks which page, then starts that page lesson.
+3. Quiz asks for a difficulty: Short (3–5 letters), Medium (6–8 letters), or Long (9 or more letters).
+4. Quiz then asks how many different words: 5, 10, or 15. That choice starts the round. Those words are shuffled from that difficulty and no others.
 
 **Study a page**
 
-She picks one of the six pages and studies every word on it, in page order:
+She studies every word on the page she picked, in page order:
 
 | Page | Words | First word | Last word |
 | --- | ---: | --- | --- |
-| One Bee | 76 | ran | money |
-| Two Bee, page 1 | 74 | cabin | soared |
-| Two Bee, page 2 | 76 | buttons | piñata |
-| Three Bee, page 1 | 67 | newt | credenza |
-| Three Bee, page 2 | 74 | territory | Aeolus |
-| Three Bee, page 3 | 83 | comprehensible | Cappadocia |
+| Page 1 | 76 | ran | money |
+| Page 2 | 74 | cabin | soared |
+| Page 3 | 76 | buttons | piñata |
+| Page 4 | 67 | newt | credenza |
+| Page 5 | 74 | territory | Aeolus |
+| Page 6 | 83 | comprehensible | Cappadocia |
 
 The spelling card stays: Hear Word, three tries, colored letters, and In a Sentence. She moves only forward, and only after the current turn is finished. Previous Word is not part of a round or a page lesson.
 

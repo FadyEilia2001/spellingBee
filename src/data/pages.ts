@@ -1,12 +1,12 @@
 import { ALL_SPELLING_WORDS } from './words.ts'
 
 export const STUDY_PAGES = [
-  { id: 'one-bee', label: 'One Bee', count: 76 },
-  { id: 'two-bee-1', label: 'Two Bee, page 1', count: 74 },
-  { id: 'two-bee-2', label: 'Two Bee, page 2', count: 76 },
-  { id: 'three-bee-1', label: 'Three Bee, page 1', count: 67 },
-  { id: 'three-bee-2', label: 'Three Bee, page 2', count: 74 },
-  { id: 'three-bee-3', label: 'Three Bee, page 3', count: 83 },
+  { id: 'page-1', label: 'Page 1', count: 76 },
+  { id: 'page-2', label: 'Page 2', count: 74 },
+  { id: 'page-3', label: 'Page 3', count: 76 },
+  { id: 'page-4', label: 'Page 4', count: 67 },
+  { id: 'page-5', label: 'Page 5', count: 74 },
+  { id: 'page-6', label: 'Page 6', count: 83 },
 ] as const
 
 export type StudyPageId = (typeof STUDY_PAGES)[number]['id']

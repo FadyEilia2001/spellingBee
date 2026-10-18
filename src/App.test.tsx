@@ -34,9 +34,9 @@ vi.mock('canvas-confetti', () => ({
 }))
 
 async function startShortRound(user: UserEvent) {
+  await user.click(screen.getByRole('button', { name: 'Quiz' }))
   await user.click(screen.getByRole('button', { name: 'Short' }))
   await user.click(screen.getByRole('button', { name: '5 words' }))
-  await user.click(screen.getByRole('button', { name: 'Start round' }))
 }
 
 describe('choice screen', () => {
@@ -49,7 +49,7 @@ describe('choice screen', () => {
   it('opens on the choices and does not speak', () => {
     render(<App />)
 
-    expect(screen.getByRole('button', { name: 'Start round' })).toBeTruthy()
+    expect(screen.getByText('Hi Ella, choose your adventure')).toBeTruthy()
     expect(screen.queryByRole('textbox', { name: /spelling guess/i })).toBeNull()
     expect(speakWord).not.toHaveBeenCalled()
   })
@@ -66,11 +66,12 @@ describe('choice screen', () => {
     expect((screen.getByRole('button', { name: /next word/i }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('starts the One Bee page at its first word', async () => {
+  it('starts page 1 at its first word', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: 'One Bee' }))
+    await user.click(screen.getByRole('button', { name: 'Study a page' }))
+    await user.click(screen.getByRole('button', { name: 'Page 1' }))
 
     expect(screen.getByTestId('clean-count').textContent).toBe('0 of 76')
     expect(screen.getAllByTestId('letter-slot')).toHaveLength(3)
@@ -243,7 +244,7 @@ describe('saved study rounds', () => {
     first.unmount()
     render(<App />)
 
-    expect(screen.getByRole('button', { name: 'Start round' })).toBeTruthy()
+    expect(screen.getByText('Hi Ella, choose your adventure')).toBeTruthy()
     expect(screen.getByTestId('total-stars').textContent).toBe('3')
     expect(screen.getByTestId('current-streak').textContent).toBe('1')
   })
@@ -311,6 +312,6 @@ describe('saved study rounds', () => {
 
     await user.click(screen.getByRole('button', { name: /back to study choices/i }))
     expect(screen.queryByTestId('round-summary')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Start round' })).toBeTruthy()
+    expect(screen.getByText('Hi Ella, choose your adventure')).toBeTruthy()
   })
 })

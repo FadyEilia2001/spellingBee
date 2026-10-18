@@ -11,6 +11,11 @@ import {
 const touchTarget =
   'min-h-[52px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200'
 
+const prompt = 'text-center text-xl font-semibold leading-snug text-stone-50'
+const choiceButton = `${touchTarget} w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-lg font-semibold text-stone-100`
+
+type Step = 'adventure' | 'page' | 'difficulty' | 'count'
+
 export function ChoiceScreen({
   onStartRound,
   onStartPage,
@@ -18,79 +23,98 @@ export function ChoiceScreen({
   onStartRound: (difficulty: Difficulty, count: RoundCount) => void
   onStartPage: (pageId: StudyPageId) => void
 }) {
+  const [step, setStep] = useState<Step>('adventure')
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null)
-  const [count, setCount] = useState<RoundCount | null>(null)
 
   return (
     <div className="mt-8">
-      <p className="text-center text-sm font-semibold tracking-[0.18em] text-stone-400 uppercase">
-        Practice a round
-      </p>
-      <div className="mt-3 grid grid-cols-3 gap-3">
-        {DIFFICULTIES.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={difficulty === item.id}
-            aria-label={item.label}
-            className={`${touchTarget} rounded-2xl border px-2 text-base font-semibold ${
-              difficulty === item.id
-                ? 'border-amber-300 bg-amber-400 text-[#1c1406]'
-                : 'border-white/10 bg-white/5 text-stone-100'
-            }`}
-            onClick={() => setDifficulty(item.id)}
-          >
-            {item.label}
-            <span className="mt-1 block text-xs font-medium opacity-80">{item.detail}</span>
-          </button>
-        ))}
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-3">
-        {ROUND_COUNTS.map((choice) => (
-          <button
-            key={choice}
-            type="button"
-            aria-pressed={count === choice}
-            aria-label={`${choice} words`}
-            className={`${touchTarget} rounded-2xl border px-2 text-base font-semibold ${
-              count === choice
-                ? 'border-amber-300 bg-amber-400 text-[#1c1406]'
-                : 'border-white/10 bg-white/5 text-stone-100'
-            }`}
-            onClick={() => setCount(choice)}
-          >
-            {choice} words
-          </button>
-        ))}
-      </div>
-      <button
-        type="button"
-        disabled={difficulty === null || count === null}
-        className={`${touchTarget} mt-3 w-full rounded-2xl bg-amber-400 px-6 text-lg font-semibold text-[#1c1406] disabled:opacity-40`}
-        onClick={() => {
-          if (difficulty === null || count === null) return
-          onStartRound(difficulty, count)
-        }}
-      >
-        Start round
-      </button>
+      {step === 'adventure' ? (
+        <>
+          <p className={prompt}>Hi Ella, choose your adventure</p>
+          <div className="mt-4 grid gap-3">
+            <button type="button" className={choiceButton} onClick={() => setStep('page')}>
+              Study a page
+            </button>
+            <button type="button" className={choiceButton} onClick={() => setStep('difficulty')}>
+              Quiz
+            </button>
+          </div>
+        </>
+      ) : null}
 
-      <p className="mt-8 text-center text-sm font-semibold tracking-[0.18em] text-stone-400 uppercase">
-        Study a page
-      </p>
-      <div className="mt-3 grid gap-3">
-        {STUDY_PAGES.map((page) => (
-          <button
-            key={page.id}
-            type="button"
-            aria-label={page.label}
-            className={`${touchTarget} rounded-2xl border border-white/10 bg-white/5 px-4 text-base font-semibold text-stone-100`}
-            onClick={() => onStartPage(page.id)}
-          >
-            {page.label}
-          </button>
-        ))}
-      </div>
+      {step === 'page' ? (
+        <>
+          <p className={prompt}>Please select which page you want to study.</p>
+          <div className="mt-4 grid gap-3">
+            {STUDY_PAGES.map((page) => (
+              <button
+                key={page.id}
+                type="button"
+                className={choiceButton}
+                onClick={() => onStartPage(page.id)}
+              >
+                {page.label}
+              </button>
+            ))}
+          </div>
+          <Back onClick={() => setStep('adventure')} />
+        </>
+      ) : null}
+
+      {step === 'difficulty' ? (
+        <>
+          <p className={prompt}>Please select the difficulty.</p>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {DIFFICULTIES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-label={item.label}
+                className={`${touchTarget} rounded-2xl border border-white/10 bg-white/5 px-2 text-base font-semibold text-stone-100`}
+                onClick={() => {
+                  setDifficulty(item.id)
+                  setStep('count')
+                }}
+              >
+                {item.label}
+                <span className="mt-1 block text-xs font-medium opacity-80">{item.detail}</span>
+              </button>
+            ))}
+          </div>
+          <Back onClick={() => setStep('adventure')} />
+        </>
+      ) : null}
+
+      {step === 'count' && difficulty !== null ? (
+        <>
+          <p className={prompt}>Please select how many words.</p>
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {ROUND_COUNTS.map((count) => (
+              <button
+                key={count}
+                type="button"
+                className={`${touchTarget} rounded-2xl border border-white/10 bg-white/5 px-2 text-base font-semibold text-stone-100`}
+                onClick={() => onStartRound(difficulty, count)}
+              >
+                {count} words
+              </button>
+            ))}
+          </div>
+          <Back onClick={() => setStep('difficulty')} />
+        </>
+      ) : null}
     </div>
+  )
+}
+
+function Back({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`${touchTarget} mt-6 w-full rounded-2xl border border-white/10 px-4 text-base font-semibold text-stone-300`}
+      onClick={onClick}
+    >
+      Back
+    </button>
   )
 }
