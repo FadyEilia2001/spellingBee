@@ -35,7 +35,7 @@ The spelling card stays: Hear Word, three tries, colored letters, and In a Sente
 
 A word's difficulty comes from how many letters it has. Spaces and hyphens are ignored. `cul-de-sac` has 8 letters and is Medium. `a cappella` has 9 letters and is Long. The spelling boxes still show spaces and hyphens, as they do now.
 
-Each word belongs to one difficulty. Short words are 3–5 letters (92 words), Medium words are 6–8 letters (183 words), and Long words are 9 or more letters (175 words).
+Each word belongs to one difficulty. Short words are 3–5 letters (92 words), Medium words are 6–8 letters (184 words), and Long words are 9 or more letters (174 words). `cul-de-sac` is the word that moves into Medium once spaces and hyphens are ignored.
 
 ## When a word comes back
 
