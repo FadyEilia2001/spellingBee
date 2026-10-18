@@ -268,13 +268,24 @@ describe('saved study rounds', () => {
       const word = queue.current ?? ''
       await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), word)
       await user.click(screen.getByRole('button', { name: /^submit$/i }))
+      const tiles = screen.getAllByTestId('attempt-tile')
+      expect(tiles.map((tile) => tile.textContent)).toEqual(Array.from(word))
+      expect(tiles.every((tile) => tile.dataset.status === 'correct')).toBe(true)
       queue = finishTurn(queue, true)
       await user.click(screen.getByRole('button', { name: /next word/i }))
     }
 
     expect(queue.current).toBe(missed)
+    speakWord.mockClear()
     await user.click(screen.getByRole('button', { name: /hear word/i }))
+    expect(speakWord).toHaveBeenCalledTimes(1)
     expect(speakWord).toHaveBeenCalledWith(missed)
+
+    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), missed)
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    const returnedTiles = screen.getAllByTestId('attempt-tile')
+    expect(returnedTiles.map((tile) => tile.textContent)).toEqual(Array.from(missed))
+    expect(returnedTiles.every((tile) => tile.dataset.status === 'correct')).toBe(true)
   })
 
   it('shows the three counts and returns to the choices', async () => {
