@@ -1,262 +1,305 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ALL_SPELLING_WORDS, entryForWord } from "./data/words.ts";
-import { containsTarget, maskSentence } from "./study/sentenceClue.ts";
-import { buildRound, emptyProgress, loadProgress, type Progress } from "./study/progress.ts";
-import App from "./App.tsx";
+import { render, screen } from '@testing-library/react'
+import userEvent, { type UserEvent } from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ALL_SPELLING_WORDS, entryForWord } from './data/words.ts'
+import { wordsForDifficulty } from './study/difficulty.ts'
+import { finishTurn, startRound, type StudyQueue } from './study/queue.ts'
+import { containsTarget, maskSentence } from './study/sentenceClue.ts'
+import App from './App.tsx'
 
-const originalRandom = Math.random;
+const originalRandom = Math.random
 
-function seededRound(progress: Progress = emptyProgress()) {
-  return buildRound(ALL_SPELLING_WORDS, progress, { random: () => 0 });
+function currentRound(): StudyQueue {
+  return startRound(wordsForDifficulty(ALL_SPELLING_WORDS, 'short'), 5, () => 0)
 }
 
 beforeEach(() => {
-  Math.random = () => 0;
-});
+  Math.random = () => 0
+})
 
 afterEach(() => {
-  Math.random = originalRandom;
-});
+  Math.random = originalRandom
+})
 
-const speakWord = vi.fn();
-const stopSpeaking = vi.fn();
+const speakWord = vi.fn()
+const stopSpeaking = vi.fn()
 
-vi.mock("./study/speech.ts", () => ({
+vi.mock('./study/speech.ts', () => ({
   speakWord: (...args: unknown[]) => speakWord(...args),
   stopSpeaking: (...args: unknown[]) => stopSpeaking(...args),
-}));
+}))
 
-vi.mock("canvas-confetti", () => ({
+vi.mock('canvas-confetti', () => ({
   default: vi.fn(),
-}));
+}))
 
-describe("study loop", () => {
+async function startShortRound(user: UserEvent) {
+  await user.click(screen.getByRole('button', { name: 'Short' }))
+  await user.click(screen.getByRole('button', { name: '5 words' }))
+  await user.click(screen.getByRole('button', { name: 'Start round' }))
+}
+
+describe('choice screen', () => {
   beforeEach(() => {
-    localStorage.clear();
-    speakWord.mockClear();
-    stopSpeaking.mockClear();
-  });
+    localStorage.clear()
+    speakWord.mockClear()
+    stopSpeaking.mockClear()
+  })
 
-  it("shows empty slots for the first word and does not speak until asked", () => {
-    render(<App />);
+  it('opens on the choices and does not speak', () => {
+    render(<App />)
 
-    expect(screen.getAllByTestId("letter-slot")).toHaveLength(Array.from(seededRound()[0] ?? "").length);
-    expect(speakWord).not.toHaveBeenCalled();
-  });
+    expect(screen.getByRole('button', { name: 'Start round' })).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: /spelling guess/i })).toBeNull()
+    expect(speakWord).not.toHaveBeenCalled()
+  })
 
-  it("speaks the current word only when Hear Word is tapped", async () => {
-    const user = userEvent.setup();
-    render(<App />);
+  it('starts a short round of five different words', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
 
-    const input = screen.getByRole("textbox", { name: /spelling guess/i });
-    await user.click(screen.getByRole("button", { name: /hear word/i }));
+    const round = currentRound()
+    expect(screen.getByTestId('clean-count').textContent).toBe('0 of 5')
+    expect(screen.getAllByTestId('letter-slot')).toHaveLength(Array.from(round.current ?? '').length)
+    expect(screen.queryByRole('button', { name: /previous word/i })).toBeNull()
+    expect((screen.getByRole('button', { name: /next word/i }) as HTMLButtonElement).disabled).toBe(true)
+  })
 
-    expect(speakWord).toHaveBeenCalledTimes(1);
-    expect(speakWord).toHaveBeenCalledWith(seededRound()[0]);
-    expect(document.activeElement).toBe(input);
-  });
+  it('starts the One Bee page at its first word', async () => {
+    const user = userEvent.setup()
+    render(<App />)
 
-  it("shows a written sentence clue and does not speak it", async () => {
-    const user = userEvent.setup();
-    render(<App />);
+    await user.click(screen.getByRole('button', { name: 'One Bee' }))
 
-    const word = seededRound()[0] ?? "";
-    const entry = entryForWord(word);
-    await user.click(screen.getByRole("button", { name: /in a sentence/i }));
+    expect(screen.getByTestId('clean-count').textContent).toBe('0 of 76')
+    expect(screen.getAllByTestId('letter-slot')).toHaveLength(3)
+    await user.click(screen.getByRole('button', { name: /hear word/i }))
+    expect(speakWord).toHaveBeenCalledWith('ran')
+  })
+})
 
-    expect(speakWord).not.toHaveBeenCalled();
-    const clue = screen.getByTestId("sentence-clue");
-    expect(containsTarget(clue.textContent ?? "", word)).toBe(false);
-    expect(screen.getByTestId("clue-definition").textContent).toBe(entry?.definition);
-    expect(screen.getByTestId("clue-sentence").textContent).toBe(
-      maskSentence(entry?.sentence ?? "", word),
-    );
-    expect(screen.getByTestId("clue-sentence").textContent).toContain("________");
-    expect((screen.getByRole("button", { name: /in a sentence/i }) as HTMLButtonElement).className).toContain(
-      "min-h-[52px]",
-    );
+describe('study loop', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    speakWord.mockClear()
+    stopSpeaking.mockClear()
+  })
 
-    await user.click(screen.getByRole("button", { name: /dismiss/i }));
-    expect(screen.queryByTestId("sentence-clue")).toBeNull();
-  });
+  it('speaks the current word only when Hear Word is tapped', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
 
-  it("plays a 10-word round and keeps every button at least 52px tall", async () => {
-    const user = userEvent.setup();
-    render(<App />);
+    const input = screen.getByRole('textbox', { name: /spelling guess/i })
+    await user.click(screen.getByRole('button', { name: /hear word/i }))
 
-    expect(screen.getByText(/word 1 of 10/i).textContent).toMatch(/word 1 of 10/i);
-    for (const button of screen.getAllByRole("button")) {
-      expect(button.className).toContain("min-h-[52px]");
+    expect(speakWord).toHaveBeenCalledTimes(1)
+    expect(speakWord).toHaveBeenCalledWith(currentRound().current)
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('shows a written sentence clue and does not speak it', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
+
+    const word = currentRound().current ?? ''
+    const entry = entryForWord(word)
+    await user.click(screen.getByRole('button', { name: /in a sentence/i }))
+
+    expect(speakWord).not.toHaveBeenCalled()
+    expect(containsTarget(screen.getByTestId('sentence-clue').textContent ?? '', word)).toBe(false)
+    expect(screen.getByTestId('clue-definition').textContent).toBe(entry?.definition)
+    expect(screen.getByTestId('clue-sentence').textContent).toBe(maskSentence(entry?.sentence ?? '', word))
+    expect((screen.getByRole('button', { name: /in a sentence/i }) as HTMLButtonElement).className).toContain(
+      'min-h-[52px]',
+    )
+
+    await user.click(screen.getByRole('button', { name: /dismiss/i }))
+    expect(screen.queryByTestId('sentence-clue')).toBeNull()
+  })
+
+  it('moves forward only after the turn is finished', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
+
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.className).toContain('min-h-[52px]')
     }
-    expect((screen.getByRole("button", { name: /previous word/i }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
-    expect((screen.getByRole("button", { name: /next word/i }) as HTMLButtonElement).disabled).toBe(true);
 
-    const round = seededRound();
-    await user.type(screen.getByRole("textbox", { name: /spelling guess/i }), round[0] ?? "");
-    await user.click(screen.getByRole("button", { name: /^submit$/i }));
-    await user.click(screen.getByRole("button", { name: /next word/i }));
+    const word = currentRound().current ?? ''
+    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), word)
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    expect(screen.getByTestId('clean-count').textContent).toBe('1 of 5')
 
-    expect(screen.getByText(/word 2 of 10/i).textContent).toMatch(/word 2 of 10/i);
-    expect(screen.getAllByTestId("letter-slot")).toHaveLength(Array.from(round[1] ?? "").length);
-    expect(speakWord).not.toHaveBeenCalled();
-  });
-});
+    await user.click(screen.getByRole('button', { name: /next word/i }))
+    const next = finishTurn(currentRound(), true)
+    expect(screen.getAllByTestId('letter-slot')).toHaveLength(Array.from(next.current ?? '').length)
+    expect(speakWord).not.toHaveBeenCalled()
+  })
+})
 
-describe("spelling attempts", () => {
+describe('spelling attempts', () => {
   beforeEach(() => {
-    localStorage.clear();
-    speakWord.mockClear();
-    stopSpeaking.mockClear();
-  });
+    localStorage.clear()
+    speakWord.mockClear()
+    stopSpeaking.mockClear()
+  })
 
-  it("fills the letter boxes from the current list word as you type", async () => {
-    const user = userEvent.setup();
-    render(<App />);
+  it('fills the letter boxes from the current word as you type', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
 
-    const word = seededRound()[0] ?? "";
-    const typed = Array.from(word).slice(0, 2).join("");
-    await user.type(screen.getByRole("textbox", { name: /spelling guess/i }), typed);
+    const word = currentRound().current ?? ''
+    const typed = Array.from(word).slice(0, 2).join('')
+    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), typed)
 
-    expect(screen.getAllByTestId("letter-slot").map((slot) => slot.textContent)).toEqual([
+    expect(screen.getAllByTestId('letter-slot').map((slot) => slot.textContent)).toEqual([
       ...Array.from(typed),
-      ...Array.from({ length: Array.from(word).length - Array.from(typed).length }, () => ""),
-    ]);
-  });
+      ...Array.from({ length: Array.from(word).length - Array.from(typed).length }, () => ''),
+    ])
+  })
 
-  it("turns a correct guess entirely green", async () => {
-    const user = userEvent.setup();
-    render(<App />);
+  it('turns a correct guess entirely green', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
 
-    const word = seededRound()[0] ?? "";
-    await user.type(screen.getByRole("textbox", { name: /spelling guess/i }), word);
-    await user.click(screen.getByRole("button", { name: /^submit$/i }));
+    const word = currentRound().current ?? ''
+    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), word)
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
 
-    const tiles = screen.getAllByTestId("attempt-tile");
-    expect(tiles.map((tile) => tile.textContent)).toEqual(Array.from(word));
-    expect(tiles.every((tile) => tile.dataset.status === "correct")).toBe(true);
-  });
+    const tiles = screen.getAllByTestId('attempt-tile')
+    expect(tiles.map((tile) => tile.textContent)).toEqual(Array.from(word))
+    expect(tiles.every((tile) => tile.dataset.status === 'correct')).toBe(true)
+  })
 
-  it("uses an 18px input and stops after three misses", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    const input = screen.getByRole("textbox", { name: /spelling guess/i });
+  it('uses an 18px input and reveals the word after three misses', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
+    const input = screen.getByRole('textbox', { name: /spelling guess/i })
 
-    expect(input.style.fontSize).toBe("18px");
+    expect(input.style.fontSize).toBe('18px')
 
-    for (const guess of ["xyz", "dog", "hat"]) {
-      await user.type(input, guess);
-      await user.click(screen.getByRole("button", { name: /^submit$/i }));
+    for (const guess of ['xyz', 'dog', 'hat']) {
+      await user.type(input, guess)
+      await user.click(screen.getByRole('button', { name: /^submit$/i }))
     }
 
-    expect(screen.getAllByTestId("attempt-row")).toHaveLength(3);
-    const revealed = screen.getByTestId("revealed-word");
-    expect(revealed.textContent).toBe(seededRound()[0]);
-    expect(revealed.className).toMatch(/font-bold/);
-    expect(revealed.className).toMatch(/green/);
-    expect(speakWord).toHaveBeenCalledTimes(1);
-    expect(speakWord).toHaveBeenCalledWith(seededRound()[0]);
-    expect((input as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getAllByTestId("attempt-row")).toHaveLength(3);
-  });
+    const revealed = screen.getByTestId('revealed-word')
+    expect(revealed.textContent).toBe(currentRound().current)
+    expect(revealed.className).toMatch(/font-bold/)
+    expect(revealed.className).toMatch(/green/)
+    expect(speakWord).toHaveBeenCalledTimes(1)
+    expect(speakWord).toHaveBeenCalledWith(currentRound().current)
+    expect((input as HTMLInputElement).disabled).toBe(true)
+  })
 
-  it("resets the attempt counter when moving to the next word", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-    const input = screen.getByRole("textbox", { name: /spelling guess/i });
+  it('starts the next word with an empty attempt counter', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
+    const input = screen.getByRole('textbox', { name: /spelling guess/i })
 
-    await user.type(input, "xyz");
-    await user.click(screen.getByRole("button", { name: /^submit$/i }));
-    expect(screen.getByText(/1 of 3/).textContent).toMatch(/1 of 3/);
-    expect((screen.getByRole("button", { name: /next word/i }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
+    await user.type(input, 'xyz')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    expect(screen.getByText(/1 of 3/).textContent).toMatch(/1 of 3/)
+    expect((screen.getByRole('button', { name: /next word/i }) as HTMLButtonElement).disabled).toBe(true)
 
-    await user.type(input, seededRound()[0] ?? "");
-    await user.click(screen.getByRole("button", { name: /^submit$/i }));
-    await user.click(screen.getByRole("button", { name: /next word/i }));
+    await user.type(input, currentRound().current ?? '')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    await user.click(screen.getByRole('button', { name: /next word/i }))
 
-    expect(screen.getByText(/0 of 3/).textContent).toMatch(/0 of 3/);
-    expect(screen.queryByTestId("attempt-tile")).toBeNull();
-    expect(screen.queryByTestId("revealed-word")).toBeNull();
-    expect((input as HTMLInputElement).value).toBe("");
-    expect((input as HTMLInputElement).disabled).toBe(false);
-  });
-});
+    expect(screen.getByText(/0 of 3/).textContent).toMatch(/0 of 3/)
+    expect(screen.queryByTestId('attempt-tile')).toBeNull()
+    expect(screen.queryByTestId('revealed-word')).toBeNull()
+    expect((input as HTMLInputElement).value).toBe('')
+    expect((input as HTMLInputElement).disabled).toBe(false)
+  })
+})
 
-describe("saved study rounds", () => {
+describe('saved study rounds', () => {
   beforeEach(() => {
-    localStorage.clear();
-    speakWord.mockClear();
-    stopSpeaking.mockClear();
-  });
+    localStorage.clear()
+    speakWord.mockClear()
+    stopSpeaking.mockClear()
+  })
 
-  it("keeps total stars and the streak after a reload", async () => {
-    const user = userEvent.setup();
-    const first = render(<App />);
+  it('keeps total stars and the streak on the choice screen after a reload', async () => {
+    const user = userEvent.setup()
+    const first = render(<App />)
+    await startShortRound(user)
 
-    await user.type(screen.getByRole("textbox", { name: /spelling guess/i }), seededRound()[0] ?? "");
-    await user.click(screen.getByRole("button", { name: /^submit$/i }));
-    expect(screen.getByTestId("total-stars").textContent).toBe("3");
-    expect(screen.getByTestId("current-streak").textContent).toBe("1");
-    expect((screen.getByTestId("streak-fill") as HTMLElement).style.width).toBe("10%");
+    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), currentRound().current ?? '')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    expect(screen.getByTestId('total-stars').textContent).toBe('3')
+    expect(screen.getByTestId('current-streak').textContent).toBe('1')
+    expect((screen.getByTestId('streak-fill') as HTMLElement).style.width).toBe('10%')
 
-    first.unmount();
-    render(<App />);
+    first.unmount()
+    render(<App />)
 
-    expect(screen.getByTestId("total-stars").textContent).toBe("3");
-    expect(screen.getByTestId("current-streak").textContent).toBe("1");
-  });
+    expect(screen.getByRole('button', { name: 'Start round' })).toBeTruthy()
+    expect(screen.getByTestId('total-stars').textContent).toBe('3')
+    expect(screen.getByTestId('current-streak').textContent).toBe('1')
+  })
 
-  it("reviews a missed word before new words", async () => {
-    const user = userEvent.setup();
-    const first = render(<App />);
-    const input = screen.getByRole("textbox", { name: /spelling guess/i });
+  it('brings a missed word back after three other words', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
 
-    for (const guess of ["xyz", "dog", "hat"]) {
-      await user.type(input, guess);
-      await user.click(screen.getByRole("button", { name: /^submit$/i }));
+    const missed = currentRound().current ?? ''
+    const input = screen.getByRole('textbox', { name: /spelling guess/i })
+    for (const guess of ['xyz', 'dog', 'hat']) {
+      await user.type(input, guess)
+      await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    }
+    expect(screen.getByTestId('revealed-word').textContent).toBe(missed)
+
+    let queue = finishTurn(currentRound(), false)
+    await user.click(screen.getByRole('button', { name: /next word/i }))
+
+    for (let step = 0; step < 3; step += 1) {
+      const word = queue.current ?? ''
+      await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), word)
+      await user.click(screen.getByRole('button', { name: /^submit$/i }))
+      queue = finishTurn(queue, true)
+      await user.click(screen.getByRole('button', { name: /next word/i }))
     }
 
-    const missed = screen.getByTestId("revealed-word").textContent;
-    first.unmount();
-    render(<App />);
+    expect(queue.current).toBe(missed)
+    await user.click(screen.getByRole('button', { name: /hear word/i }))
+    expect(speakWord).toHaveBeenCalledWith(missed)
+  })
 
-    const round = buildRound(ALL_SPELLING_WORDS, loadProgress(), { random: () => 0 });
-    await user.click(screen.getByRole("button", { name: /hear word/i }));
-    expect(round).toContain(missed);
-    expect(round).toContain(speakWord.mock.calls.at(-1)?.[0]);
-    expect(screen.getByTestId("total-stars").textContent).toBe("0");
-    expect(screen.getByTestId("current-streak").textContent).toBe("0");
-  });
+  it('shows the three counts and returns to the choices', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await startShortRound(user)
 
-  it("shows a celebratory summary after a 10-word round", async () => {
-    const user = userEvent.setup();
-    render(<App />);
-
-    const round = seededRound();
-    for (const word of round) {
-      await user.type(screen.getByRole("textbox", { name: /spelling guess/i }), word);
-      await user.click(screen.getByRole("button", { name: /^submit$/i }));
-      const next = screen.queryByRole("button", { name: /next word/i });
-      if (next) await user.click(next);
+    let queue = currentRound()
+    for (let step = 0; step < queue.started.length; step += 1) {
+      await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), queue.current ?? '')
+      await user.click(screen.getByRole('button', { name: /^submit$/i }))
+      queue = finishTurn(queue, true)
+      const next = screen.queryByRole('button', { name: /next word/i })
+      if (next) await user.click(next)
     }
 
-    expect(screen.getByTestId("round-summary")).toBeTruthy();
-    expect(screen.getByTestId("round-stars").textContent).toMatch(/30/);
-    expect(screen.getByTestId("round-accuracy").textContent).toMatch(/100%/);
-    expect(screen.getByRole("button", { name: /new round/i })).toBeTruthy();
-    expect(
-      (screen.getByRole("button", { name: /review missed words/i }) as HTMLButtonElement).disabled,
-    ).toBe(true);
+    expect(screen.getByTestId('round-summary')).toBeTruthy()
+    expect(screen.getByTestId('round-stars').textContent).toMatch(/15/)
+    expect(screen.getByTestId('clean-first').textContent).toMatch(/5/)
+    expect(screen.getByTestId('clean-later').textContent).toMatch(/0/)
+    expect(screen.getByTestId('set-aside').textContent).toMatch(/0/)
+    expect(screen.queryByRole('button', { name: /review missed words/i })).toBeNull()
 
-    await user.click(screen.getByRole("button", { name: /new round/i }));
-    expect(screen.queryByTestId("round-summary")).toBeNull();
-    expect(screen.getByText(/word 1 of 10/i).textContent).toMatch(/word 1 of 10/i);
-    const nextRound = buildRound(ALL_SPELLING_WORDS, loadProgress(), { random: () => 0 });
-    expect(screen.getAllByTestId("letter-slot")).toHaveLength(Array.from(nextRound[0] ?? "").length);
-  });
-});
+    await user.click(screen.getByRole('button', { name: /back to study choices/i }))
+    expect(screen.queryByTestId('round-summary')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Start round' })).toBeTruthy()
+  })
+})

@@ -1,22 +1,33 @@
 import { useRef, useState, type FormEvent } from 'react'
 import confetti from 'canvas-confetti'
-import { ChevronLeft, ChevronRight, Flame, Star, Volume2 } from 'lucide-react'
+import { ChevronRight, Flame, Star, Volume2 } from 'lucide-react'
 import { ALL_SPELLING_WORDS, entryForWord } from './data/words.ts'
+import { wordsForPage } from './data/pages.ts'
 import {
   evaluateGuess,
   isSolvedGuess,
   MAX_ATTEMPTS,
   type LetterMark,
 } from './study/evaluateGuess.ts'
+import { wordsForDifficulty, type Difficulty, type RoundCount } from './study/difficulty.ts'
+import { ChoiceScreen } from './study/ChoiceScreen.tsx'
 import {
   appendRoundHistory,
-  buildRound,
   loadProgress,
-  recordResult,
+  recordTurn,
   saveProgress,
   starsFor,
   type Progress,
 } from './study/progress.ts'
+import {
+  cleanCount,
+  finishTurn,
+  isSessionComplete,
+  sessionTally,
+  startQueue,
+  startRound,
+  type StudyQueue,
+} from './study/queue.ts'
 import { maskSentence } from './study/sentenceClue.ts'
 import { speakWord, stopSpeaking } from './study/speech.ts'
 import { slotCount } from './study/wordCycling.ts'
@@ -26,16 +37,11 @@ type Attempt = {
   marks: LetterMark[]
 }
 
-type RoundSlot = {
-  word: string
-  attempts: Attempt[]
-  recorded: boolean
-}
-
-type RoundSummary = {
+type SessionSummary = {
   stars: number
-  correct: number
-  total: number
+  cleanOnFirstAppearance: number
+  cleanAfterReturn: number
+  setAside: number
 }
 
 const markTone: Record<LetterMark, string> = {
@@ -86,14 +92,6 @@ function SentenceClue({
   )
 }
 
-function createSlots(words: string[]): RoundSlot[] {
-  return words.map((word) => ({ word, attempts: [], recorded: false }))
-}
-
-function slotSolved(slot: RoundSlot): boolean {
-  return slot.attempts.some((attempt) => isSolvedGuess(attempt.guess, slot.word))
-}
-
 function streakLabel(streak: number): string {
   if (streak >= 10) return 'On fire'
   if (streak >= 6) return 'Heating up'
@@ -102,50 +100,45 @@ function streakLabel(streak: number): string {
   return 'Start a streak'
 }
 
+function turnIsClean(attempts: Attempt[], word: string): boolean {
+  const first = attempts[0]
+  return attempts.length === 1 && first !== undefined && isSolvedGuess(first.guess, word)
+}
+
 function App() {
   const [progress, setProgress] = useState<Progress>(loadProgress)
-  const [slots, setSlots] = useState<RoundSlot[]>(() =>
-    createSlots(buildRound(ALL_SPELLING_WORDS, loadProgress())),
-  )
-  const [index, setIndex] = useState(0)
+  const [queue, setQueue] = useState<StudyQueue | null>(null)
+  const [attempts, setAttempts] = useState<Attempt[]>([])
+  const [recorded, setRecorded] = useState(false)
   const [draft, setDraft] = useState('')
-  const [summary, setSummary] = useState<RoundSummary | null>(null)
+  const [summary, setSummary] = useState<SessionSummary | null>(null)
+  const [sessionStars, setSessionStars] = useState(0)
   const [clueOpen, setClueOpen] = useState(false)
   const guessRef = useRef<HTMLInputElement>(null)
-  const slot = slots[index]
-  const word = slot?.word ?? ''
+
+  const word = queue?.current ?? ''
   const characters = Array.from(word)
-  const attempts = slot?.attempts ?? []
-  const solved = slot ? slotSolved(slot) : false
+  const solved = attempts.some((attempt) => isSolvedGuess(attempt.guess, word))
   const failed = !solved && attempts.length >= MAX_ATTEMPTS
   const locked = solved || failed
   const entry = entryForWord(word)
+  const pendingClean = queue !== null && recorded && turnIsClean(attempts, word)
+  const shownClean = (queue ? cleanCount(queue) : 0) + (pendingClean ? 1 : 0)
 
-  function showPreviousWord() {
-    if (index === 0) return
+  function openSession(nextQueue: StudyQueue) {
+    if (nextQueue.current === null) return
     stopSpeaking()
-    setDraft('')
-    setClueOpen(false)
-    setIndex(index - 1)
-  }
-
-  function showNextWord() {
-    if (!locked || index >= slots.length - 1) return
-    stopSpeaking()
-    setDraft('')
-    setClueOpen(false)
-    setIndex(index + 1)
-  }
-
-  function startRound(reviewOnly = false) {
-    stopSpeaking()
-    const words = buildRound(ALL_SPELLING_WORDS, progress, { reviewOnly })
-    if (words.length === 0) return
-    setSlots(createSlots(words))
-    setIndex(0)
+    setQueue(nextQueue)
+    setAttempts([])
+    setRecorded(false)
     setDraft('')
     setClueOpen(false)
     setSummary(null)
+    setSessionStars(0)
+  }
+
+  function startDifficultyRound(difficulty: Difficulty, count: RoundCount) {
+    openSession(startRound(wordsForDifficulty(ALL_SPELLING_WORDS, difficulty), count))
   }
 
   function showSentenceClue() {
@@ -157,49 +150,69 @@ function App() {
   function submitGuess(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const guess = draft.trim()
-    if (!guess || !slot || locked) return
+    if (!guess || !queue?.current || locked) return
 
     const nextAttempts = [...attempts, { guess, marks: evaluateGuess(guess, word) }]
     const nowSolved = isSolvedGuess(guess, word)
     const nowLocked = nowSolved || nextAttempts.length >= MAX_ATTEMPTS
-    const nextSlots = slots.map((item, slotIndex) =>
-      slotIndex === index
-        ? { ...item, attempts: nextAttempts, recorded: item.recorded || nowLocked }
-        : item,
-    )
+    setAttempts(nextAttempts)
+    setDraft('')
 
-    let nextProgress = progress
-    if (nowLocked && !slot.recorded) {
-      nextProgress = recordResult(nextProgress, word, nextAttempts.length, nowSolved)
-      if (nextSlots.every((item) => item.recorded)) {
-        const correct = nextSlots.filter(slotSolved).length
-        const roundStars = nextSlots.reduce(
-          (total, item) => total + starsFor(item.attempts.length, slotSolved(item)),
-          0,
-        )
-        nextProgress = appendRoundHistory(nextProgress, {
-          stars: roundStars,
-          correct,
-          total: nextSlots.length,
-        })
-        setSummary({ stars: roundStars, correct, total: nextSlots.length })
-        void confetti({
-          particleCount: 140,
-          spread: 80,
-          origin: { y: 0.65 },
-          colors: ['#fbbf24', '#4ade80', '#fde68a'],
-        })
-      }
+    if (nowLocked && !recorded) {
+      const nextProgress = recordTurn(progress, nextAttempts.length, nowSolved)
       saveProgress(nextProgress)
       setProgress(nextProgress)
+      setSessionStars((current) => current + starsFor(nextAttempts.length, nowSolved))
+      setRecorded(true)
+      if (!nowSolved) speakWord(word)
     }
-
-    setSlots(nextSlots)
-    setDraft('')
-    if (!nowSolved && nextAttempts.length >= MAX_ATTEMPTS) speakWord(word)
   }
 
-  const accuracy = summary ? Math.round((summary.correct / summary.total) * 100) : 0
+  function showNextWord() {
+    if (!queue || !recorded) return
+    stopSpeaking()
+    const finished = finishTurn(queue, turnIsClean(attempts, word))
+    if (isSessionComplete(finished)) {
+      const tally = sessionTally(finished)
+      const nextProgress = appendRoundHistory(progress, {
+        stars: sessionStars,
+        correct: tally.cleanOnFirstAppearance + tally.cleanAfterReturn,
+        total: tally.started,
+      })
+      saveProgress(nextProgress)
+      setProgress(nextProgress)
+      setQueue(finished)
+      setSummary({
+        stars: sessionStars,
+        cleanOnFirstAppearance: tally.cleanOnFirstAppearance,
+        cleanAfterReturn: tally.cleanAfterReturn,
+        setAside: tally.setAside,
+      })
+      void confetti({
+        particleCount: 140,
+        spread: 80,
+        origin: { y: 0.65 },
+        colors: ['#fbbf24', '#4ade80', '#fde68a'],
+      })
+      return
+    }
+
+    setQueue(finished)
+    setAttempts([])
+    setRecorded(false)
+    setDraft('')
+    setClueOpen(false)
+  }
+
+  function backToChoices() {
+    stopSpeaking()
+    setQueue(null)
+    setAttempts([])
+    setRecorded(false)
+    setDraft('')
+    setClueOpen(false)
+    setSummary(null)
+  }
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-[#0e1210] px-4 py-8 text-stone-100">
@@ -248,54 +261,43 @@ function App() {
             <p className="text-sm font-semibold tracking-[0.28em] text-amber-200 uppercase">
               Round complete
             </p>
-            <p
-              data-testid="round-stars"
-              className="mt-4 font-serif text-6xl text-amber-300"
-            >
+            <p data-testid="round-stars" className="mt-4 font-serif text-6xl text-amber-300">
               {summary.stars} stars
             </p>
-            <p data-testid="round-accuracy" className="mt-2 text-xl text-stone-100">
-              {accuracy}% accuracy
+            <p data-testid="clean-first" className="mt-4 text-xl text-stone-100">
+              {summary.cleanOnFirstAppearance} on the first try
             </p>
-            <p className="mt-1 text-sm text-stone-400">
-              {summary.correct} of {summary.total} words spelled
+            <p data-testid="clean-later" className="mt-1 text-xl text-stone-100">
+              {summary.cleanAfterReturn} after practice
             </p>
-            <p className="mt-6 text-sm text-stone-400">
-              {progress.reviewQueue.length === 0
-                ? 'Nothing waiting for review'
-                : `${progress.reviewQueue.length} words need review`}
+            <p data-testid="set-aside" className="mt-1 text-xl text-stone-100">
+              {summary.setAside} set aside
             </p>
             {progress.streakHistory.length > 0 ? (
               <ol className="mx-auto mt-4 max-w-xs space-y-1 text-left text-sm text-stone-400">
-                {progress.streakHistory.slice(-3).map((entry) => (
-                  <li key={entry.completedAt}>
-                    {entry.correct}/{entry.total} correct · {entry.stars} stars
+                {progress.streakHistory.slice(-3).map((history) => (
+                  <li key={history.completedAt}>
+                    {history.correct}/{history.total} correct · {history.stars} stars
                   </li>
                 ))}
               </ol>
             ) : null}
-            <div className="mt-8 grid gap-3">
-              <button
-                type="button"
-                className={`${touchTarget} rounded-2xl bg-amber-400 px-6 text-lg font-semibold text-[#1c1406] transition hover:bg-amber-300`}
-                onClick={() => startRound(false)}
-              >
-                New round
-              </button>
-              <button
-                type="button"
-                disabled={progress.reviewQueue.length === 0}
-                className={`${touchTarget} rounded-2xl border border-white/10 bg-white/5 px-6 text-base font-semibold text-stone-100 transition hover:bg-white/10 disabled:opacity-40`}
-                onClick={() => startRound(true)}
-              >
-                Review missed words
-              </button>
-            </div>
+            <button
+              type="button"
+              className={`${touchTarget} mt-8 w-full rounded-2xl bg-amber-400 px-6 text-lg font-semibold text-[#1c1406]`}
+              onClick={backToChoices}
+            >
+              Back to study choices
+            </button>
           </div>
-        ) : (
+        ) : queue?.current ? (
           <>
-            <p className="mt-2 text-center text-sm text-stone-400">
-              Word {index + 1} of {slots.length}
+            <p
+              data-testid="clean-count"
+              className="mt-2 text-center text-sm text-stone-400"
+              aria-label={`${shownClean} of ${queue.started.length} words clean`}
+            >
+              {shownClean} of {queue.started.length}
             </p>
 
             <form onSubmit={submitGuess} className="mt-8">
@@ -313,7 +315,7 @@ function App() {
                     const isNext = !locked && slotIndex === typed.length
                     return (
                       <span
-                        key={`${word}-${slotIndex}`}
+                        key={`${word}-${slotIndex}-${queue.appearances[word] ?? 0}`}
                         data-testid="letter-slot"
                         aria-hidden="true"
                         className={
@@ -331,9 +333,9 @@ function App() {
                     )
                   })}
                 </div>
-              <input
-                ref={guessRef}
-                id="spelling-guess"
+                <input
+                  ref={guessRef}
+                  id="spelling-guess"
                   name="guess"
                   value={draft}
                   disabled={locked}
@@ -393,10 +395,7 @@ function App() {
             </ol>
 
             {failed ? (
-              <p
-                data-testid="revealed-word"
-                className="mt-5 text-center text-3xl font-bold text-green-400"
-              >
+              <p data-testid="revealed-word" className="mt-5 text-center text-3xl font-bold text-green-400">
                 {word}
               </p>
             ) : null}
@@ -427,27 +426,21 @@ function App() {
               </button>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                disabled={index === 0}
-                className={`${touchTarget} flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-stone-100 transition hover:bg-white/10 disabled:opacity-40`}
-                onClick={showPreviousWord}
-              >
-                <ChevronLeft aria-hidden="true" />
-                Previous Word
-              </button>
-              <button
-                type="button"
-                disabled={!locked || index >= slots.length - 1}
-                className={`${touchTarget} flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-stone-100 transition hover:bg-white/10 disabled:opacity-40`}
-                onClick={showNextWord}
-              >
-                Next Word
-                <ChevronRight aria-hidden="true" />
-              </button>
-            </div>
+            <button
+              type="button"
+              disabled={!recorded}
+              className={`${touchTarget} mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-medium text-stone-100 transition hover:bg-white/10 disabled:opacity-40`}
+              onClick={showNextWord}
+            >
+              Next Word
+              <ChevronRight aria-hidden="true" />
+            </button>
           </>
+        ) : (
+          <ChoiceScreen
+            onStartRound={startDifficultyRound}
+            onStartPage={(pageId) => openSession(startQueue(wordsForPage(pageId)))}
+          />
         )}
       </section>
     </main>
