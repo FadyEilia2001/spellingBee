@@ -78,6 +78,7 @@ type SessionSummary = {
 type FinishedTurn = { next: StudyQueue; stars: number }
 
 const PRACTICE_SIZE = 10
+const PAGE_QUIZ_SIZE = 10
 
 // A short practice run or warm-up never replaces the paused lesson she can keep going on.
 function keepsSpot(kind: SessionKind): boolean {
@@ -199,6 +200,10 @@ function App() {
     const first = set * SET_SIZE + 1
     const chosen = setsOf(words)[set] ?? []
     openSession('page', `${pageLabel(pageId)} · Words ${first}–${first + chosen.length - 1}`, startQueue(chosen), 0, pageId)
+  }
+
+  function startPageQuiz(pageId: StudyPageId) {
+    openSession('round', `${pageLabel(pageId)} quiz`, startRound(wordsForPage(pageId), PAGE_QUIZ_SIZE), 0, pageId)
   }
 
   function startPageTest(pageId: StudyPageId) {
@@ -568,6 +573,7 @@ function App() {
               todayNext={todayNext()}
               onToday={() => studyToday()}
               onStartPageTest={startPageTest}
+              onStartPageQuiz={startPageQuiz}
               onResume={() => {
                 if (resume) openSession(resume.kind, resume.label, resume.queue, resume.stars)
               }}

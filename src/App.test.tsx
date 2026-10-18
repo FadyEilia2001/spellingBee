@@ -556,6 +556,20 @@ describe('page a day', () => {
     expect(screen.getByTestId('set-2').textContent).toBe('Words 21–306/10')
   })
 
+  it('quizzes 10 random words from the page and shows the page after', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(screen.getByRole('button', { name: 'Study a page' }))
+    await user.click(screen.getByRole('button', { name: /^Page 1\b/ }))
+    await user.click(screen.getByRole('button', { name: /quiz me on this page/i }))
+
+    expect(screen.getByText('Page 1 quiz')).toBeTruthy()
+    expect(screen.getByTestId('clean-count').textContent).toBe('0 of 10')
+    await user.click(screen.getByRole('button', { name: /i'm done for now/i }))
+    await user.click(screen.getByRole('button', { name: /yes, stop here/i }))
+    expect(screen.getByTestId('progress-page-1')).toBeTruthy()
+  })
+
   it('finishes the page with the page test and moves today to the next page', async () => {
     const user = userEvent.setup()
     localStorage.setItem('spellingBee.words', JSON.stringify({ learned: page1, practice: [] }))

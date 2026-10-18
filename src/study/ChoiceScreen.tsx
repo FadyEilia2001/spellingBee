@@ -50,6 +50,7 @@ export function ChoiceScreen({
   todayNext = '',
   onToday = () => {},
   onStartPageTest = () => {},
+  onStartPageQuiz = () => {},
 }: {
   onStartRound: (difficulty: Difficulty, count: RoundCount) => void
   onStartPage: (pageId: StudyPageId, set?: number) => void
@@ -65,6 +66,7 @@ export function ChoiceScreen({
   todayNext?: string
   onToday?: () => void
   onStartPageTest?: (pageId: StudyPageId) => void
+  onStartPageQuiz?: (pageId: StudyPageId) => void
 }) {
   const [step, setStep] = useState<Step>('adventure')
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null)
@@ -180,7 +182,7 @@ export function ChoiceScreen({
 
       {step === 'scope' ? (
         <>
-          <p className={prompt}>Pick a set of 10, select words, or study the whole page.</p>
+          <p className={prompt}>Pick a set of 10, take a quiz, or study the whole page.</p>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {setsOf(wordsForPage(pageId)).map((set, index) => {
               const first = index * SET_SIZE + 1
@@ -224,8 +226,18 @@ export function ChoiceScreen({
                 {scopeStatus.test ? `Retake the page test (last ${scopeStatus.test.score}/${scopeStatus.test.total})` : 'Take the page test'}
               </button>
             ) : (
-              <p className="text-center text-sm text-stone-400">The page test opens once every set has a ✓.</p>
+              <p className="text-center text-sm text-stone-400">
+                The page test opens once every set has a ✓ ({scopeStatus.setsDone} of {scopeStatus.sets} so far).
+              </p>
             )}
+            <button
+              type="button"
+              className={`${touchTarget} w-full rounded-2xl border border-amber-300/40 bg-amber-400/15 px-4 text-lg font-semibold text-amber-100`}
+              onClick={() => onStartPageQuiz(pageId)}
+            >
+              🎲 Quiz me on this page
+              <span className="block text-sm font-medium text-amber-100/70">10 random words from the page</span>
+            </button>
             <button type="button" className={choiceButton} onClick={() => setStep('pick')}>
               Select words
             </button>

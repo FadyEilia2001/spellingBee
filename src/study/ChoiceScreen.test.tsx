@@ -45,7 +45,7 @@ describe('choice screen', () => {
     stopLine.mockClear()
     await user.click(screen.getByRole('button', { name: /^Page 2\b/ }))
 
-    expect(screen.getByText('Pick a set of 10, select words, or study the whole page.')).toBeTruthy()
+    expect(screen.getByText('Pick a set of 10, take a quiz, or study the whole page.')).toBeTruthy()
     expect(stopLine).toHaveBeenCalled()
     expect(playLine).not.toHaveBeenCalled()
     expect(onStartPage).not.toHaveBeenCalled()
@@ -110,7 +110,7 @@ describe('choice screen', () => {
     await user.click(screen.getByRole('button', { name: 'cabin' }))
     await user.click(screen.getByRole('button', { name: 'Back' }))
 
-    expect(screen.getByText('Pick a set of 10, select words, or study the whole page.')).toBeTruthy()
+    expect(screen.getByText('Pick a set of 10, take a quiz, or study the whole page.')).toBeTruthy()
     expect(onStartPick).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: 'Select words' }))
