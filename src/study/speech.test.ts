@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DUCKED_VOLUME, TUNE_VOLUME } from "./lines.ts";
+import { resetSoundtrack, startTune, tuneVolume } from "./soundtrack.ts";
 import { speakWord, stopSpeaking, SPEECH_RATE } from "./speech.ts";
 
 class SpeechSynthesisUtteranceStub {
@@ -47,6 +49,7 @@ class FakeAudio {
 let playImpl: () => Promise<void> = () => Promise.resolve();
 
 beforeEach(() => {
+  resetSoundtrack();
   FakeAudio.instances = [];
   playImpl = () => Promise.resolve();
   vi.stubGlobal("SpeechSynthesisUtterance", SpeechSynthesisUtteranceStub);
@@ -203,5 +206,26 @@ describe("pronunciation", () => {
 
     expect(spoken).toHaveLength(0);
     expect(FakeAudio.instances[0]?.paused).toBe(true);
+  });
+
+  it("ducks the tune while the spelling word plays", async () => {
+    startTune();
+    await flush();
+    speakWord("mist", mockSynth());
+    await flush();
+
+    expect(tuneVolume()).toBe(DUCKED_VOLUME);
+    FakeAudio.instances[1]?.dispatch("ended");
+    expect(tuneVolume()).toBe(TUNE_VOLUME);
+  });
+
+  it("restores the tune when pronunciation is stopped", async () => {
+    startTune();
+    await flush();
+    speakWord("mist", mockSynth());
+    await flush();
+    stopSpeaking(mockSynth());
+
+    expect(tuneVolume()).toBe(TUNE_VOLUME);
   });
 });

@@ -1,10 +1,24 @@
 import { spellingAudioUrl } from "./audioFile.ts";
+import { duckTune, stopLine, unduckTune } from "./soundtrack.ts";
 
 export const SPEECH_RATE = 0.82;
 
 let activeUtterance: SpeechSynthesisUtterance | null = null;
 let currentAudio: HTMLAudioElement | null = null;
 let pronunciationId = 0;
+let wordDucked = false;
+
+function holdWordDuck(): void {
+  if (wordDucked) return;
+  wordDucked = true;
+  duckTune();
+}
+
+function releaseWordDuck(): void {
+  if (!wordDucked) return;
+  wordDucked = false;
+  unduckTune();
+}
 
 function englishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
   return (
@@ -34,9 +48,11 @@ function speakText(text: string, rate: number, synth: SpeechSynthesis): void {
   }
 
   activeUtterance = utterance;
+  holdWordDuck();
   utterance.onend = () => {
     if (activeUtterance === utterance) {
       activeUtterance = null;
+      releaseWordDuck();
     }
   };
 
@@ -49,6 +65,8 @@ export function speakWord(
   synth: SpeechSynthesis = window.speechSynthesis,
 ): void {
   const pronunciation = ++pronunciationId;
+  stopLine();
+  releaseWordDuck();
   silenceAudio(currentAudio);
 
   if (synth.speaking || synth.pending) {
@@ -74,6 +92,11 @@ export function speakWord(
   };
 
   audio.addEventListener("error", fallback);
+  audio.addEventListener("ended", () => {
+    if (currentAudio !== audio) return;
+    currentAudio = null;
+    releaseWordDuck();
+  });
   void Promise.resolve(audio.play()).then(
     () => {
       if (pronunciation !== pronunciationId || currentAudio !== audio) {
@@ -81,6 +104,7 @@ export function speakWord(
         return;
       }
       settled = true;
+      holdWordDuck();
     },
     fallback,
   );
@@ -91,6 +115,7 @@ export function stopSpeaking(synth: SpeechSynthesis = window.speechSynthesis): v
   activeUtterance = null;
   silenceAudio(currentAudio);
   currentAudio = null;
+  releaseWordDuck();
   if (synth.speaking || synth.pending) {
     synth.cancel();
   }
