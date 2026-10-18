@@ -3,6 +3,7 @@ import {
   advance,
   applyMessage,
   backToLobby,
+  abandonMatch,
   clearOverall,
   currentWord,
   emptyMatch,
@@ -129,6 +130,21 @@ describe('family match', () => {
     expect(match.phase).toBe('done')
     match = readyNext(match, 'Mom')
     expect(match.phase).toBe('lobby')
+  })
+
+  it('returns to the lobby when the last phone leaves or someone starts over', () => {
+    let match = startMatch(seated(), ['ran'])
+    match = leave(match, 'Ella')
+    expect(match.phase).toBe('spelling')
+    match = leave(match, 'Mom')
+    expect(match.phase).toBe('lobby')
+    expect(match.words).toEqual([])
+    expect(match.seats.Ella).toBeNull()
+
+    match = startMatch(sit(sit(emptyMatch({ Ella: 4, Mom: 1, Dad: 0 }), 'Ella'), 'Mom'), ['ran'])
+    match = abandonMatch(match)
+    expect(match.phase).toBe('lobby')
+    expect(match.overall).toEqual({ Ella: 4, Mom: 1, Dad: 0 })
   })
 
   it('clears the overall total in the lobby and reloads a saved game with everyone away', () => {

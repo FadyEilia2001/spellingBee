@@ -189,6 +189,7 @@ export function FamilyMatch({
           phase={view?.phase ?? 'lobby'}
           host={host}
           onSit={(seat) => send({ type: 'sit', seat })}
+          onStartOver={() => send({ type: 'abandon' })}
         />
       ) : null}
       {open && you !== null && view?.phase === 'lobby' ? (
@@ -346,11 +347,13 @@ function SeatPicker({
   phase,
   host,
   onSit,
+  onStartOver,
 }: {
   seats: DuelView['seats'] | undefined
   phase: DuelView['phase']
   host: boolean
   onSit: (seat: Seat) => void
+  onStartOver: () => void
 }) {
   const choices = SEATS.filter((seat) => {
     const player = seats?.[seat]
@@ -375,6 +378,15 @@ function SeatPicker({
           )
         })}
       </div>
+      {phase !== 'lobby' ? (
+        <button
+          type="button"
+          className={`${touchTarget} mt-4 w-full rounded-2xl border border-white/10 px-4 text-base font-semibold text-stone-300`}
+          onClick={onStartOver}
+        >
+          Start over
+        </button>
+      ) : null}
     </div>
   )
 }

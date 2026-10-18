@@ -59,6 +59,7 @@ export type ClientMessage =
   | { type: 'next' }
   | { type: 'again' }
   | { type: 'clear' }
+  | { type: 'abandon' }
 
 const DIFFICULTIES: readonly Difficulty[] = ['short', 'medium', 'long']
 const COUNTS: readonly RoundCount[] = [5, 10, 15]
@@ -205,7 +206,14 @@ export function leave(match: DuelMatch, seat: Seat): DuelMatch {
   if (match.phase === 'lobby') {
     return { ...match, seats: { ...match.seats, [seat]: null } }
   }
-  return settle({ ...match, seats: { ...match.seats, [seat]: { ...current, connected: false } } })
+  const next = settle({ ...match, seats: { ...match.seats, [seat]: { ...current, connected: false } } })
+  if (connectedPlayers(next).length === 0) return emptyMatch(next.overall)
+  return next
+}
+
+export function abandonMatch(match: DuelMatch): DuelMatch {
+  if (match.phase === 'lobby') return match
+  return emptyMatch(match.overall)
 }
 
 export function setOptions(match: DuelMatch, difficulty: Difficulty, count: RoundCount): DuelMatch {
@@ -370,6 +378,9 @@ export function applyMessage(
   if (message.type === 'leave') {
     if (seat === null) return { match, seat }
     return { match: leave(match, seat), seat: null }
+  }
+  if (message.type === 'abandon') {
+    return { match: abandonMatch(match), seat: null }
   }
   if (seat === null) return { match, seat }
   if (message.type === 'options') return { match: setOptions(match, message.difficulty, message.count), seat }

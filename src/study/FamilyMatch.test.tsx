@@ -162,12 +162,15 @@ describe('family match screen', () => {
   })
 
   it('tells a late phone the game already started and offers a dropped seat', async () => {
+    const user = userEvent.setup()
     const room = harness()
     render(<FamilyMatch host={false} onBack={vi.fn()} connect={room.connect} />)
     const match = startMatch(sit(sit(emptyMatch(), 'Ella'), 'Mom'), ['ran'])
     room.show(viewFor(match, null))
     expect(await screen.findByText('This game already started.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Dad' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Start over' }))
+    expect(room.sent.at(-1)).toEqual({ type: 'abandon' })
 
     room.show(viewFor(leave(match, 'Mom'), null))
     expect(await screen.findByRole('button', { name: 'Mom' })).toBeTruthy()
