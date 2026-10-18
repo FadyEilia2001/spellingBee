@@ -55,12 +55,18 @@ type SessionSummary = {
   cleanAfterReturn: number
   practicing: string[]
   complete: boolean
+  saved: boolean
 }
 
 // The result of the turn on screen, held until she taps Next.
 type FinishedTurn = { next: StudyQueue; stars: number }
 
 const PRACTICE_SIZE = 10
+
+// A short practice run never replaces the paused lesson she can keep going on.
+function keepsSpot(kind: SessionKind): boolean {
+  return kind !== 'practice'
+}
 
 function streakLabel(streak: number): string {
   if (streak >= 10) return 'On fire'
@@ -149,7 +155,7 @@ function App() {
     stopSpeaking()
     stopLine()
     const next = { kind, label, queue: nextQueue, stars }
-    saveSession(next)
+    if (keepsSpot(kind)) saveSession(next)
     setSession(next)
     setTurn(null)
     setSummary(null)
@@ -174,7 +180,7 @@ function App() {
 
   function startBee(tier: BeeTier, count: RoundCount) {
     const words = SPELLING_ENTRIES.filter((entry) => entry.tier === tier).map((entry) => entry.word)
-    openSession('bee', `${tier} bee`, startRound(words, count))
+    openSession('bee', `Bee mode · ${tier}`, startRound(words, count))
   }
 
   function startPractice(words: readonly string[]) {
@@ -201,7 +207,9 @@ function App() {
           : dropTurn(session.queue)
         : finishTurn(session.queue, clean)
     const stars = session.stars + starsFor(attemptsUsed, solved)
-    if (isSessionComplete(next)) clearSession()
+    if (!keepsSpot(session.kind)) {
+      // practice runs don't touch the saved spot
+    } else if (isSessionComplete(next)) clearSession()
     else saveSession({ ...session, queue: next, stars })
     setTurn({ next, stars })
   }
@@ -222,6 +230,7 @@ function App() {
       cleanAfterReturn: tally.cleanAfterReturn,
       practicing: wordsToPractice(finished),
       complete,
+      saved: !complete && session !== null && keepsSpot(session.kind),
     })
     setSession(null)
     setTurn(null)
@@ -354,9 +363,9 @@ function App() {
                 ))}
               </ul>
             ) : null}
-            {summary.complete ? null : (
+            {summary.saved ? (
               <p className="mt-4 text-base text-stone-300">Your spot is saved. Pick “Keep going” next time.</p>
-            )}
+            ) : null}
             {summary.practicing.length > 0 ? (
               <button
                 type="button"

@@ -31,3 +31,23 @@ _Avoid_: custom quiz, partial page, trunk
 **Clean spelling**:
 Spelling the word correctly on the first try of its current turn.
 _Avoid_: mastered, solved
+
+**Set**:
+Ten words of a page in page order (Words 1–10, 11–20, …), studied as a page lesson.
+_Avoid_: chunk, batch
+
+**Bee mode**:
+A round from one school level (One, Two or Three Bee) played like the stage: one try, a minute on the clock, no taking letters back, and asks for definition, sentence, part of speech and origin.
+_Avoid_: hard mode, contest
+
+**Learned word**:
+A word she has spelled cleanly at least once, or correctly in Bee mode.
+_Avoid_: mastered
+
+**Practice words**:
+Words she missed that are not learned yet.
+_Avoid_: mistakes, wrong words
+
+**Keep going**:
+Picking up a paused lesson, round or Bee mode where she left off. A practice run is never paused this way.
+_Avoid_: resume, continue

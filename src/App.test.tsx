@@ -401,7 +401,13 @@ describe('saved study rounds', () => {
     expect(screen.getByRole('list', { name: /still practicing/i }).textContent).toBe(missed)
     await user.click(screen.getByRole('button', { name: /back to study choices/i }))
     expect(screen.getByRole('button', { name: /keep going: short quiz/i }).textContent).toMatch(/5 words left/)
-    expect(screen.getByRole('button', { name: /my practice words \(1\)/i })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /my practice words \(1\)/i }))
+    expect(screen.getByText('My practice words')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /i'm done for now/i }))
+    await user.click(screen.getByRole('button', { name: /yes, stop here/i }))
+    expect(screen.queryByText(/your spot is saved/i)).toBeNull()
+    await user.click(screen.getByRole('button', { name: /back to study choices/i }))
+    expect(screen.getByRole('button', { name: /keep going: short quiz/i })).toBeTruthy()
   })
 
   it('fills in a hyphen for her', async () => {
