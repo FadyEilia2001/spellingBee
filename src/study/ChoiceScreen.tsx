@@ -7,7 +7,7 @@ import {
   type RoundCount,
 } from './difficulty.ts'
 import { type LineId } from './lines.ts'
-import { playLine, stopLine } from './soundtrack.ts'
+import { playLine, playTick, stopLine } from './soundtrack.ts'
 import { WordPick } from './WordPick.tsx'
 
 const touchTarget =
@@ -102,7 +102,12 @@ export function ChoiceScreen({
       ) : null}
 
       {step === 'pick' ? (
-        <WordPick words={wordsForPage(pageId)} onPlay={onStartPick} onBack={() => setStep('scope')} />
+        <WordPick
+          words={wordsForPage(pageId)}
+          onPlay={onStartPick}
+          onBack={() => setStep('scope')}
+          onToggle={playTick}
+        />
       ) : null}
 
       {step === 'difficulty' ? (

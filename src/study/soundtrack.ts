@@ -15,6 +15,7 @@ import {
 const FALLBACK_RATE = 0.82
 
 let tune: HTMLAudioElement | null = null
+let tickContext: AudioContext | null = null
 let lineAudio: HTMLAudioElement | null = null
 let ducks = 0
 let lineDucked = false
@@ -149,6 +150,32 @@ export function playLine(id: LineId, synth: SpeechSynthesis = window.speechSynth
   )
 }
 
+export function playTick(on: boolean): void {
+  try {
+    const Context =
+      window.AudioContext ??
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Context) return
+    tickContext ??= new Context()
+    if (tickContext.state === 'suspended') void tickContext.resume()
+
+    const now = tickContext.currentTime
+    const osc = tickContext.createOscillator()
+    const gain = tickContext.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = on ? 880 : 494
+    gain.gain.setValueAtTime(0.0001, now)
+    gain.gain.exponentialRampToValueAtTime(on ? 0.07 : 0.04, now + 0.012)
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + (on ? 0.07 : 0.05))
+    osc.connect(gain)
+    gain.connect(tickContext.destination)
+    osc.start(now)
+    osc.stop(now + 0.08)
+  } catch {
+    // A tick never blocks a highlight.
+  }
+}
+
 export function playEffect(id: EffectId): void {
   try {
     const audio = new Audio(EFFECTS[id])
@@ -196,6 +223,7 @@ export function resumeTune(): void {
 
 export function resetSoundtrack(): void {
   stopLine()
+  tickContext = null
   if (tune) {
     tune.pause()
     tune.src = ''

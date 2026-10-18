@@ -41,6 +41,7 @@ vi.mock('./study/soundtrack.ts', () => ({
   playLine: (...args: unknown[]) => playLine(...args),
   stopLine: (...args: unknown[]) => stopLine(...args),
   playEffect: (...args: unknown[]) => playEffect(...args),
+  playTick: () => {},
   pauseTune: () => {
     musicPreference = 'paused'
     localStorage.setItem('spellingBee.music', 'paused')

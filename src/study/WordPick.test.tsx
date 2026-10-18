@@ -17,6 +17,8 @@ describe('word pick list', () => {
       expect(button.className).toContain('min-h-[52px]')
     }
     expect(screen.getByRole('button', { name: 'cabin', pressed: false }).className).toContain('bg-white/5')
+    expect(screen.getByRole('button', { name: 'cabin' }).parentElement?.className).toContain('grid-cols-2')
+    expect(screen.getByRole('button', { name: 'cabin' }).parentElement?.className).toContain('sm:grid-cols-4')
   })
 
   it('plays highlighted words in list order', async () => {
@@ -51,7 +53,8 @@ describe('word pick list', () => {
   it('disables Play again when the last highlight is cleared', async () => {
     const user = userEvent.setup()
     const onPlay = vi.fn()
-    render(<WordPick words={words} onPlay={onPlay} onBack={vi.fn()} />)
+    const onToggle = vi.fn()
+    render(<WordPick words={words} onPlay={onPlay} onBack={vi.fn()} onToggle={onToggle} />)
 
     await user.click(screen.getByRole('button', { name: 'cabin' }))
     await user.click(screen.getByRole('button', { name: 'cabin' }))
@@ -59,6 +62,8 @@ describe('word pick list', () => {
     expect(screen.getByRole('button', { name: 'cabin', pressed: false })).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Play' }) as HTMLButtonElement).disabled).toBe(true)
     expect(onPlay).not.toHaveBeenCalled()
+    expect(onToggle).toHaveBeenNthCalledWith(1, true)
+    expect(onToggle).toHaveBeenNthCalledWith(2, false)
   })
 
   it('goes back without playing', async () => {

@@ -5,6 +5,7 @@ import {
   pauseTune,
   playEffect,
   playLine,
+  playTick,
   resetSoundtrack,
   resumeTune,
   startTune,
@@ -100,6 +101,42 @@ describe('soundtrack', () => {
 
     line?.dispatch('ended')
     expect(tuneVolume()).toBe(TUNE_VOLUME)
+  })
+
+  it('plays a higher tick when a word is highlighted and a lower tick when it is cleared', () => {
+    const frequencies: number[] = []
+
+    class FakeContext {
+      state = 'running'
+      currentTime = 0
+      resume() {}
+      createOscillator() {
+        const osc = {
+          type: 'sine',
+          frequency: { value: 0 },
+          connect() {},
+          start() {
+            frequencies.push(osc.frequency.value)
+          },
+          stop() {},
+        }
+        return osc
+      }
+      createGain() {
+        return {
+          gain: {
+            setValueAtTime() {},
+            exponentialRampToValueAtTime() {},
+          },
+          connect() {},
+        }
+      }
+    }
+
+    vi.stubGlobal('AudioContext', FakeContext)
+    playTick(true)
+    playTick(false)
+    expect(frequencies).toEqual([880, 494])
   })
 
   it('plays an effect without changing the tune', async () => {

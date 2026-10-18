@@ -10,6 +10,7 @@ const stopLine = vi.fn()
 vi.mock('./soundtrack.ts', () => ({
   playLine: (...args: unknown[]) => playLine(...args),
   stopLine: (...args: unknown[]) => stopLine(...args),
+  playTick: () => {},
 }))
 
 describe('choice screen', () => {
