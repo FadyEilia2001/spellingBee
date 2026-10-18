@@ -11,7 +11,12 @@ import {
 } from './study/evaluateGuess.ts'
 import { wordsForDifficulty, type Difficulty, type RoundCount } from './study/difficulty.ts'
 import { ChoiceScreen } from './study/ChoiceScreen.tsx'
-import { connectFamilyRoom, FamilyMatch } from './study/FamilyMatch.tsx'
+import {
+  connectFamilyRoom,
+  FamilyMatch,
+  familyHomePageUrl,
+  familyMatchLivesHere,
+} from './study/FamilyMatch.tsx'
 import { roomHasCompany } from './study/duel.ts'
 import {
   appendRoundHistory,
@@ -139,6 +144,10 @@ function App() {
 
   useEffect(() => {
     if (import.meta.env.MODE === 'test') return
+    if (!familyMatchLivesHere()) {
+      setRoomReady(true)
+      return
+    }
     const timer = window.setTimeout(() => setRoomReady(true), 2000)
     const room = connectFamilyRoom((next) => {
       window.clearTimeout(timer)
@@ -154,6 +163,17 @@ function App() {
       window.clearTimeout(timer)
       room.close()
     }
+  }, [])
+
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test') return
+    if (!familyMatchLivesHere()) return
+    if (new URLSearchParams(location.search).get('family') !== '1') return
+    stopSpeaking()
+    hushSoundtrack()
+    hostRef.current = true
+    setJoining(false)
+    setFamily(true)
   }, [])
 
   const word = queue?.current ?? ''
@@ -550,6 +570,10 @@ function App() {
               onStartPage={(pageId) => openSession(startQueue(wordsForPage(pageId)), true)}
               onStartPick={(words) => openSession(startQueue(words), true)}
               onPlayFamily={() => {
+                if (!familyMatchLivesHere()) {
+                  location.assign(`${familyHomePageUrl()}/?family=1`)
+                  return
+                }
                 stopSpeaking()
                 hushSoundtrack()
                 hostRef.current = true

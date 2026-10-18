@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { FamilyMatch, type RoomConnection } from './FamilyMatch.tsx'
+import { FamilyMatch, familyHomePageUrl, familyMatchLivesHere, type RoomConnection } from './FamilyMatch.tsx'
 import { advance, emptyMatch, leave, sit, startMatch, submitGuess, viewFor, type ClientMessage, type DuelView } from './duel.ts'
 
 vi.mock('./soundtrack.ts', () => ({
@@ -30,6 +30,13 @@ function harness() {
   }
   return { sent, connect, show: (view: DuelView) => publish(view) }
 }
+
+describe('family room address', () => {
+  it('points phones at the home page when they are not already there', () => {
+    expect(familyHomePageUrl()).toBe('http://10.0.0.187:8787')
+    expect(familyMatchLivesHere()).toBe(false)
+  })
+})
 
 describe('family match screen', () => {
   it('sits down, starts a round, and shows this game plus the overall score', async () => {

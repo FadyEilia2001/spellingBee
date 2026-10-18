@@ -32,7 +32,31 @@ export type RoomConnection = {
   close: () => void
 }
 
+const DEFAULT_FAMILY_HOME = 'http://10.0.0.187:8787'
+
+export function familyHomePageUrl(): string {
+  const configured = import.meta.env.VITE_FAMILY_HOME_URL
+  if (typeof configured === 'string' && configured.length > 0) return configured.replace(/\/$/, '')
+  const duel = import.meta.env.VITE_DUEL_URL
+  if (typeof duel === 'string' && duel.startsWith('ws://')) return `http://${duel.slice('ws://'.length)}`.replace(/\/$/, '')
+  if (typeof duel === 'string' && duel.startsWith('wss://')) return `https://${duel.slice('wss://'.length)}`.replace(/\/$/, '')
+  return DEFAULT_FAMILY_HOME
+}
+
+export function familyMatchLivesHere(): boolean {
+  if (typeof location === 'undefined') return true
+  try {
+    return location.origin === new URL(familyHomePageUrl()).origin
+  } catch {
+    return location.protocol !== 'https:'
+  }
+}
+
 export function familyRoomUrl(): string {
+  if (typeof location !== 'undefined' && familyMatchLivesHere()) {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${location.host}`
+  }
   const configured = import.meta.env.VITE_DUEL_URL
   if (typeof configured === 'string' && configured.length > 0) return configured
   if (typeof location !== 'undefined' && location.host) {
@@ -151,7 +175,11 @@ export function FamilyMatch({
       <Scoreboard view={view} />
       {open === false ? (
         <p className="mt-6 text-center text-lg text-stone-200" data-testid="room-offline">
-          The family room is not reachable. Phones need to be on the home Wi-Fi.
+          The family room is not reachable on this page. On home Wi-Fi, open{' '}
+          <a className="font-semibold text-amber-200 underline" href={familyHomePageUrl()}>
+            {familyHomePageUrl()}
+          </a>
+          .
         </p>
       ) : null}
       {open === null ? <p className="mt-6 text-center text-lg text-stone-200">One moment</p> : null}
