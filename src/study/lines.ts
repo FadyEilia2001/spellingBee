@@ -26,6 +26,14 @@ export const LINES = {
     url: '/audio/lines/yes.mp3',
     text: 'Yes!',
   },
+  tryAgain: {
+    url: '/audio/lines/try-again.mp3',
+    text: 'Close! Try again.',
+  },
+  bee: {
+    url: '/audio/lines/bee.mp3',
+    text: 'Bee mode! Which bee are you ready for?',
+  },
   finished: {
     url: '/audio/lines/finished.mp3',
     text: 'You finished!',

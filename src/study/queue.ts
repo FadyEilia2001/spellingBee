@@ -91,6 +91,22 @@ export function finishTurn(queue: StudyQueue, firstTryClean: boolean): StudyQueu
   return moveTo(queue, inserted, { appearances: seen })
 }
 
+// Bee mode: a missed word does not come back in the round.
+export function dropTurn(queue: StudyQueue): StudyQueue {
+  const word = queue.current
+  if (word === null) return queue
+  return moveTo(queue, queue.upcoming, {
+    appearances: { ...queue.appearances, [word]: (queue.appearances[word] ?? 0) + 1 },
+    setAside: [...queue.setAside, word],
+  })
+}
+
+// Words she has met this session that are not spelled cleanly yet.
+export function wordsToPractice(queue: StudyQueue): string[] {
+  const clean = new Set([...queue.firstAppearanceClean, ...queue.cleanAfterReturn])
+  return queue.started.filter((word) => (queue.appearances[word] ?? 0) > 0 && !clean.has(word))
+}
+
 export function isSessionComplete(queue: StudyQueue): boolean {
   return queue.current === null
 }

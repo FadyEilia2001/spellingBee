@@ -86,4 +86,20 @@ describe('family room server', () => {
     expect(returning.view().overall.Mom).toBe(3)
     expect(returning.view().phase).toBe('reveal')
   })
+
+  it('frees the seat of a phone that stops answering pings', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'family-room-'))
+    const server = await startDuelServer({ port: 0, scoresPath: path.join(dir, 'scores.json'), heartbeatMs: 50 })
+    closers.push(server.close)
+
+    const ella = await open(server.port)
+    const dad = await open(server.port)
+    await waitFor(() => ella.view().phase === 'lobby')
+    dad.send({ type: 'sit', seat: 'Dad' })
+    await waitFor(() => ella.view().seats.Dad?.connected === true)
+
+    // ponytail: pausing the raw socket stops the client from reading pings, like a sleeping phone.
+    ;(dad.socket as unknown as { _socket: { pause: () => void } })._socket.pause()
+    await waitFor(() => ella.view().seats.Dad === null)
+  })
 })

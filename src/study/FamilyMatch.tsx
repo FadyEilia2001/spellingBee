@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ALL_SPELLING_WORDS, entryForWord } from '../data/words.ts'
 import { wordsForDifficulty, DIFFICULTIES, ROUND_COUNTS, type Difficulty, type RoundCount } from './difficulty.ts'
 import {
+  isSeat,
   SEATS,
   type ClientMessage,
   type DuelView,
@@ -66,29 +67,90 @@ export function familyRoomUrl(): string {
   return 'ws://127.0.0.1:8787'
 }
 
+export const SEAT_STORAGE_KEY = 'spellingBee.seat'
+const MAX_RETRY_MS = 10_000
+
+function rememberSeat(message: ClientMessage) {
+  try {
+    if (message.type === 'sit') sessionStorage.setItem(SEAT_STORAGE_KEY, message.seat)
+    if (message.type === 'leave' || message.type === 'abandon') sessionStorage.removeItem(SEAT_STORAGE_KEY)
+  } catch {
+    // ponytail: no sessionStorage means she picks her seat again after a drop.
+  }
+}
+
+function rememberedSeat(): Seat | null {
+  try {
+    const seat = sessionStorage.getItem(SEAT_STORAGE_KEY)
+    return isSeat(seat) ? seat : null
+  } catch {
+    return null
+  }
+}
+
+// Keeps a socket to the family room open: it reconnects with backoff when the
+// phone sleeps or Wi-Fi blips, and right away when the page is shown again.
+// With rejoin, it also sits back down in the seat this tab last took.
 export function connectFamilyRoom(
   onView: (view: DuelView) => void,
   onOpen: (open: boolean) => void,
+  { rejoin = false }: { rejoin?: boolean } = {},
 ): RoomConnection {
-  const socket = new WebSocket(familyRoomUrl())
-  socket.addEventListener('open', () => onOpen(true))
-  socket.addEventListener('close', () => onOpen(false))
-  socket.addEventListener('message', (event) => {
-    const parsed = JSON.parse(String(event.data)) as { view?: DuelView }
-    if (parsed.view) onView(parsed.view)
-  })
+  let socket: WebSocket
+  let closed = false
+  let retries = 0
+  let retryTimer: number | undefined
+
+  function connect() {
+    window.clearTimeout(retryTimer)
+    socket = new WebSocket(familyRoomUrl())
+    socket.addEventListener('open', () => {
+      retries = 0
+      const seat = rejoin ? rememberedSeat() : null
+      if (seat) socket.send(JSON.stringify({ type: 'sit', seat }))
+      onOpen(true)
+    })
+    socket.addEventListener('close', () => {
+      if (closed) return
+      onOpen(false)
+      retryTimer = window.setTimeout(connect, Math.min(1000 * 2 ** retries, MAX_RETRY_MS))
+      retries += 1
+    })
+    socket.addEventListener('message', (event) => {
+      const parsed = JSON.parse(String(event.data)) as { view?: DuelView }
+      if (parsed.view) onView(parsed.view)
+    })
+  }
+
+  function wake() {
+    if (document.visibilityState !== 'visible' || closed) return
+    if (socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) connect()
+  }
+
+  connect()
+  document.addEventListener('visibilitychange', wake)
   return {
     send: (message) => {
+      if (rejoin) rememberSeat(message)
       if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
     },
-    close: () => socket.close(),
+    close: () => {
+      closed = true
+      window.clearTimeout(retryTimer)
+      document.removeEventListener('visibilitychange', wake)
+      socket.close()
+    },
   }
+}
+
+function rejoinFamilyRoom(onView: (view: DuelView) => void, onOpen: (open: boolean) => void): RoomConnection {
+  return connectFamilyRoom(onView, onOpen, { rejoin: true })
 }
 
 export function FamilyMatch({
   onBack,
   host = true,
-  connect = connectFamilyRoom,
+  connect = rejoinFamilyRoom,
 }: {
   onBack: () => void
   host?: boolean
@@ -151,6 +213,7 @@ export function FamilyMatch({
     if (!guess || locked || Array.from(guess).length !== Array.from(word).length) return
     send({ type: 'guess', guess })
     setDraft('')
+    guessRef.current?.focus()
   }
 
   function startGame() {
@@ -170,17 +233,27 @@ export function FamilyMatch({
     setClueOpen(false)
   }, [view?.index, view?.phase])
 
+  const spellingWord = view?.phase === 'spelling' && you !== null && !locked ? word : ''
+  useEffect(() => {
+    if (!spellingWord) return
+    const timer = window.setTimeout(() => speakWord(spellingWord), 350)
+    return () => window.clearTimeout(timer)
+  }, [spellingWord, view?.index])
+
   return (
     <div className="mt-6" data-testid="family-match">
       <Scoreboard view={view} />
       {open === false ? (
-        <p className="mt-6 text-center text-lg text-stone-200" data-testid="room-offline">
-          The family room is not reachable on this page. On home Wi-Fi, open{' '}
-          <a className="font-semibold text-amber-200 underline" href={familyHomePageUrl()}>
-            {familyHomePageUrl()}
-          </a>
-          .
-        </p>
+        <div className="mt-6 text-center" data-testid="room-offline">
+          <p className="text-lg text-stone-200">Reconnecting to the family room…</p>
+          <p className="mt-2 text-sm text-stone-400">
+            If this keeps up, check you're on home Wi-Fi and open{' '}
+            <a className="font-semibold text-amber-200 underline" href={familyHomePageUrl()}>
+              {familyHomePageUrl()}
+            </a>
+            .
+          </p>
+        </div>
       ) : null}
       {open === null ? <p className="mt-6 text-center text-lg text-stone-200">One moment</p> : null}
       {open && you === null ? (
@@ -190,6 +263,7 @@ export function FamilyMatch({
           host={host}
           onSit={(seat) => send({ type: 'sit', seat })}
           onStartOver={() => send({ type: 'abandon' })}
+          onPracticeAlone={host ? undefined : onBack}
         />
       ) : null}
       {open && you !== null && view?.phase === 'lobby' ? (
@@ -217,14 +291,20 @@ export function FamilyMatch({
               <button
                 type="button"
                 className={`${touchTarget} mt-4 w-full rounded-2xl bg-amber-400 px-3 text-lg font-semibold text-[#1c1406]`}
-                onClick={() => speakWord(word)}
+                onClick={() => {
+                  speakWord(word)
+                  guessRef.current?.focus()
+                }}
               >
                 Hear Word
               </button>
               <button
                 type="button"
                 className={`${touchTarget} mt-3 w-full rounded-2xl border border-amber-200/30 bg-amber-400/15 px-3 text-base font-semibold text-amber-100`}
-                onClick={() => setClueOpen(true)}
+                onClick={() => {
+                  setClueOpen(true)
+                  guessRef.current?.focus()
+                }}
               >
                 In a Sentence
               </button>
@@ -249,6 +329,7 @@ export function FamilyMatch({
                       ref={guessRef}
                       id="family-guess"
                       value={draft}
+                      autoFocus
                       maxLength={Array.from(word).length}
                       autoCapitalize="none"
                       autoCorrect="off"
@@ -348,13 +429,16 @@ function SeatPicker({
   host,
   onSit,
   onStartOver,
+  onPracticeAlone,
 }: {
   seats: DuelView['seats'] | undefined
   phase: DuelView['phase']
   host: boolean
   onSit: (seat: Seat) => void
   onStartOver: () => void
+  onPracticeAlone?: () => void
 }) {
+  const [confirmStartOver, setConfirmStartOver] = useState(false)
   const choices = SEATS.filter((seat) => {
     const player = seats?.[seat]
     if (phase !== 'lobby') return player !== null && player !== undefined && player.connected !== true
@@ -378,13 +462,45 @@ function SeatPicker({
           )
         })}
       </div>
-      {phase !== 'lobby' ? (
+      {phase !== 'lobby' && confirmStartOver ? (
+        <div className="mt-4">
+          <p className="text-center text-base text-stone-200">This ends the game for everyone. Start over?</p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              className={`${touchTarget} rounded-2xl bg-white/10 px-3 text-base font-semibold text-stone-100`}
+              onClick={() => {
+                setConfirmStartOver(false)
+                onStartOver()
+              }}
+            >
+              Yes, start over
+            </button>
+            <button
+              type="button"
+              className={`${touchTarget} rounded-2xl border border-white/10 px-3 text-base font-semibold text-stone-300`}
+              onClick={() => setConfirmStartOver(false)}
+            >
+              Keep the game
+            </button>
+          </div>
+        </div>
+      ) : phase !== 'lobby' ? (
         <button
           type="button"
           className={`${touchTarget} mt-4 w-full rounded-2xl border border-white/10 px-4 text-base font-semibold text-stone-300`}
-          onClick={onStartOver}
+          onClick={() => setConfirmStartOver(true)}
         >
           Start over
+        </button>
+      ) : null}
+      {onPracticeAlone ? (
+        <button
+          type="button"
+          className={`${touchTarget} mt-4 w-full rounded-2xl border border-white/10 px-4 text-base font-semibold text-stone-300`}
+          onClick={onPracticeAlone}
+        >
+          Practice on my own
         </button>
       ) : null}
     </div>

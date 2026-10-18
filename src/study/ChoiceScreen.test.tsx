@@ -24,7 +24,7 @@ describe('choice screen', () => {
     expect(screen.getByRole('button', { name: 'Study a page' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Quiz' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Play with mom/dad' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Page 1' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Page 1\b/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Short' })).toBeNull()
     for (const button of screen.getAllByRole('button')) {
       expect(button.className).toContain('min-h-[52px]')
@@ -43,9 +43,9 @@ describe('choice screen', () => {
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
     playLine.mockClear()
     stopLine.mockClear()
-    await user.click(screen.getByRole('button', { name: 'Page 2' }))
+    await user.click(screen.getByRole('button', { name: /^Page 2\b/ }))
 
-    expect(screen.getByText('Select words or study the whole page.')).toBeTruthy()
+    expect(screen.getByText('Pick a set of 10, take a quiz, or study the whole page.')).toBeTruthy()
     expect(stopLine).toHaveBeenCalled()
     expect(playLine).not.toHaveBeenCalled()
     expect(onStartPage).not.toHaveBeenCalled()
@@ -64,7 +64,7 @@ describe('choice screen', () => {
     render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={vi.fn()} onPlayFamily={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
-    await user.click(screen.getByRole('button', { name: 'Page 2' }))
+    await user.click(screen.getByRole('button', { name: /^Page 2\b/ }))
     playLine.mockClear()
     await user.click(screen.getByRole('button', { name: 'Back' }))
 
@@ -78,7 +78,7 @@ describe('choice screen', () => {
     render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={onStartPick} onPlayFamily={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
-    await user.click(screen.getByRole('button', { name: 'Page 2' }))
+    await user.click(screen.getByRole('button', { name: /^Page 2\b/ }))
     playLine.mockClear()
     stopLine.mockClear()
     await user.click(screen.getByRole('button', { name: 'Select words' }))
@@ -105,12 +105,12 @@ describe('choice screen', () => {
     render(<ChoiceScreen onStartRound={vi.fn()} onStartPage={vi.fn()} onStartPick={onStartPick} onPlayFamily={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
-    await user.click(screen.getByRole('button', { name: 'Page 2' }))
+    await user.click(screen.getByRole('button', { name: /^Page 2\b/ }))
     await user.click(screen.getByRole('button', { name: 'Select words' }))
     await user.click(screen.getByRole('button', { name: 'cabin' }))
     await user.click(screen.getByRole('button', { name: 'Back' }))
 
-    expect(screen.getByText('Select words or study the whole page.')).toBeTruthy()
+    expect(screen.getByText('Pick a set of 10, take a quiz, or study the whole page.')).toBeTruthy()
     expect(onStartPick).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: 'Select words' }))

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   cleanCount,
+  dropTurn,
+  wordsToPractice,
   finishTurn,
   isSessionComplete,
   MAX_APPEARANCES,
@@ -83,5 +85,20 @@ describe('study queue', () => {
     expect(page.started).toEqual(['ran', 'rod', 'shy'])
     expect(page.current).toBe('ran')
     expect(page.upcoming).toEqual(['rod', 'shy'])
+  })
+})
+
+describe('bee mode turns', () => {
+  it('sets a missed word aside without bringing it back', () => {
+    const queue = dropTurn(startQueue(['ran', 'rod']))
+    expect(queue.current).toBe('rod')
+    expect(queue.upcoming).toEqual([])
+    expect(queue.setAside).toEqual(['ran'])
+    expect(wordsToPractice(queue)).toEqual(['ran'])
+  })
+
+  it('lists only words met and not clean as words to practice', () => {
+    const queue = finishTurn(finishTurn(startQueue(['ran', 'rod', 'shy']), true), false)
+    expect(wordsToPractice(queue)).toEqual(['rod'])
   })
 })
