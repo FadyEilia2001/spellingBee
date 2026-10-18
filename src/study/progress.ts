@@ -83,6 +83,17 @@ export function buildRound(
   return round
 }
 
+export function recordTurn(progress: Progress, attemptsUsed: number, solved: boolean): Progress {
+  const firstTryClean = solved && attemptsUsed === 1
+  const currentStreak = firstTryClean ? progress.currentStreak + 1 : 0
+  return {
+    ...progress,
+    totalStars: progress.totalStars + starsFor(attemptsUsed, solved),
+    currentStreak,
+    bestStreak: Math.max(progress.bestStreak, currentStreak),
+  }
+}
+
 export function recordResult(
   progress: Progress,
   word: string,

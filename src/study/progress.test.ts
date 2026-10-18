@@ -7,6 +7,7 @@ import {
   loadProgress,
   PROGRESS_STORAGE_KEY,
   recordResult,
+  recordTurn,
   ROUND_SIZE,
   saveProgress,
   starsFor,
@@ -119,5 +120,34 @@ describe('local progress', () => {
     localStorage.setItem(PROGRESS_STORAGE_KEY, '{')
 
     expect(loadProgress()).toEqual(emptyProgress())
+  })
+})
+
+describe('first-try scoring', () => {
+  it('continues the streak only on a first try and awards stars by the try used', () => {
+    const first = recordTurn(emptyProgress(), 1, true)
+    expect(first.totalStars).toBe(3)
+    expect(first.currentStreak).toBe(1)
+    expect(first.bestStreak).toBe(1)
+
+    const second = recordTurn(first, 2, true)
+    expect(second.totalStars).toBe(5)
+    expect(second.currentStreak).toBe(0)
+    expect(second.bestStreak).toBe(1)
+
+    const third = recordTurn(emptyProgress(), 3, true)
+    expect(third.totalStars).toBe(1)
+    expect(third.currentStreak).toBe(0)
+
+    const missed = recordTurn(first, 3, false)
+    expect(missed.totalStars).toBe(3)
+    expect(missed.currentStreak).toBe(0)
+    expect(missed.bestStreak).toBe(1)
+  })
+
+  it('awards stars again on a later turn', () => {
+    const again = recordTurn(recordTurn(emptyProgress(), 1, true), 1, true)
+    expect(again.totalStars).toBe(6)
+    expect(again.currentStreak).toBe(2)
   })
 })
