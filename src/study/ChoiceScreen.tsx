@@ -7,6 +7,7 @@ import {
   type Difficulty,
   type RoundCount,
 } from './difficulty.ts'
+import { beeDayCountdown } from './daily.ts'
 import type { WordBook } from './learned.ts'
 import { pageStatus, SET_SIZE, setsOf, type PageTests } from './pagePlan.ts'
 import { PageProgress } from './PageProgress.tsx'
@@ -70,6 +71,7 @@ export function ChoiceScreen({
   const learned = new Set(book.learned)
   const todayStatus = today ? pageStatus(today, book, tests) : null
   const scopeStatus = pageStatus(pageId, book, tests)
+  const countdown = beeDayCountdown()
 
   useEffect(() => {
     if (step === 'scope' || step === 'pick') {
@@ -89,6 +91,14 @@ export function ChoiceScreen({
           <p className={prompt}>Hi Ella, choose your adventure.</p>
           <p className={`${prompt} mt-2`}>You can study a page or embark on a quiz.</p>
           <div className="mt-4 grid gap-3">
+            {countdown ? (
+              <p
+                data-testid="bee-countdown"
+                className="rounded-2xl border border-amber-300/40 bg-amber-400/10 px-4 py-2 text-center text-lg font-semibold text-amber-200"
+              >
+                {countdown}
+              </p>
+            ) : null}
             {todayStatus ? (
               <button
                 type="button"

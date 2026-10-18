@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { dayStreak, DAY_GOAL, recordWord, type Days } from './daily.ts'
+import { beeDayCountdown, dayStreak, DAY_GOAL, recordWord, type Days } from './daily.ts'
 import { emptyBook, noteWord } from './learned.ts'
 import { startQueue } from './queue.ts'
 import { loadSession, saveSession, SESSION_STORAGE_KEY, wordsLeft } from './savedSession.ts'
@@ -18,6 +18,16 @@ describe('daily streak', () => {
 
   it('adds one word to today', () => {
     expect(recordWord({ '2026-10-18': 4 }, '2026-10-18')).toEqual({ '2026-10-18': 5 })
+  })
+})
+
+describe('bee day countdown', () => {
+  it('counts down to Monday, October 26 and then goes away', () => {
+    expect(beeDayCountdown('2026-10-18')).toBe('8 days to Bee Day 🐝')
+    expect(beeDayCountdown('2026-10-25')).toBe('Tomorrow is Bee Day! 🐝')
+    expect(beeDayCountdown('2026-10-26')).toBe('Today is Bee Day! Good luck, Ella! 🐝')
+    expect(beeDayCountdown('2026-10-27')).toBeNull()
+    expect(beeDayCountdown('2026-11-01', '2026-11-03')).toBe('2 days to Bee Day 🐝')
   })
 })
 

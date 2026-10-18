@@ -1,5 +1,6 @@
 export const DAYS_STORAGE_KEY = 'spellingBee.days'
 export const DAY_GOAL = 10
+export const BEE_DAY = '2026-10-26'
 
 // Words finished on each local day, keyed "YYYY-MM-DD".
 export type Days = Record<string, number>
@@ -50,4 +51,18 @@ export function saveDays(days: Days): void {
   } catch {
     // ponytail: storage blocked; the streak just won't grow.
   }
+}
+
+function dayNumber(day: string): number {
+  const [year, month, date] = day.split('-').map(Number)
+  return Date.UTC(year!, month! - 1, date!) / 86_400_000
+}
+
+// The countdown line on the home screen, or null once the bee is over.
+export function beeDayCountdown(today: string = localDay(), beeDay: string = BEE_DAY): string | null {
+  const days = dayNumber(beeDay) - dayNumber(today)
+  if (days < 0) return null
+  if (days === 0) return 'Today is Bee Day! Good luck, Ella! 🐝'
+  if (days === 1) return 'Tomorrow is Bee Day! 🐝'
+  return `${days} days to Bee Day 🐝`
 }
