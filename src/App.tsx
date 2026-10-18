@@ -80,11 +80,6 @@ type FinishedTurn = { next: StudyQueue; stars: number }
 const PRACTICE_SIZE = 10
 const PAGE_QUIZ_SIZE = 10
 
-// A short practice run or warm-up never replaces the paused lesson she can keep going on.
-function keepsSpot(kind: SessionKind): boolean {
-  return kind !== 'practice' && kind !== 'warmup'
-}
-
 // One try per word, and a miss doesn't come back in the same session.
 function oneTry(kind: SessionKind): boolean {
   return kind === 'bee' || kind === 'pageTest'
@@ -110,7 +105,6 @@ function App() {
   const [session, setSession] = useState<SavedSession | null>(null)
   const [turn, setTurn] = useState<FinishedTurn | null>(null)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
-  const [resume, setResume] = useState<SavedSession | null>(loadSession)
   const [confirmQuit, setConfirmQuit] = useState(false)
   const [music, setMusic] = useState(readMusicPreference)
   const [family, setFamily] = useState(false)
@@ -171,6 +165,12 @@ function App() {
   const shownClean = queue ? cleanCount(queue) : 0
   const listLesson = session !== null && session.kind !== 'round' && !oneTry(session.kind)
   const today = todaysPage(book, tests)
+
+  // Only work on today's page is saved to pick up later, from the Today
+  // button. Quizzes, Bee mode and practice runs are short and just end.
+  function keepsSpot(kind: SessionKind, pageId: StudyPageId | undefined): boolean {
+    return kind !== 'warmup' && pageId !== undefined && pageId === today
+  }
   const remaining = queue ? queue.started.length - shownClean : 0
   const streakDays = dayStreak(days)
 
@@ -179,7 +179,7 @@ function App() {
     stopSpeaking()
     stopLine()
     const next: SavedSession = { kind, label, queue: nextQueue, stars, ...(pageId ? { pageId } : {}) }
-    if (keepsSpot(kind)) saveSession(next)
+    if (keepsSpot(kind, pageId)) saveSession(next)
     setSession(next)
     setTurn(null)
     setSummary(null)
@@ -271,8 +271,8 @@ function App() {
           : dropTurn(session.queue)
         : finishTurn(session.queue, clean)
     const stars = session.stars + starsFor(attemptsUsed, solved)
-    if (!keepsSpot(session.kind)) {
-      // practice runs don't touch the saved spot
+    if (!keepsSpot(session.kind, session.pageId)) {
+      // nothing to pick up later
     } else if (isSessionComplete(next)) clearSession()
     else saveSession({ ...session, queue: next, stars })
     setTurn({ next, stars })
@@ -303,7 +303,7 @@ function App() {
       cleanAfterReturn: tally.cleanAfterReturn,
       practicing: wordsToPractice(finished),
       complete,
-      saved: !complete && session !== null && keepsSpot(session.kind),
+      saved: !complete && session !== null && keepsSpot(session.kind, session.pageId),
       kind: session?.kind ?? 'round',
       pageId: session?.pageId,
       ...(test ? { test } : {}),
@@ -335,7 +335,7 @@ function App() {
   function quitForNow() {
     if (!session) return
     stopSpeaking()
-    // The saved session already holds every finished word, so it resumes here.
+    // For today's page, the saved session already holds every finished word, so it resumes here.
     endSession(turn?.next ?? session.queue, turn?.stars ?? session.stars)
   }
 
@@ -345,7 +345,6 @@ function App() {
     setSession(null)
     setTurn(null)
     setSummary(null)
-    setResume(loadSession())
   }
 
   return (
@@ -440,7 +439,7 @@ function App() {
               </ul>
             ) : null}
             {summary.saved ? (
-              <p className="mt-4 text-base text-stone-300">Your spot is saved. Pick “Keep going” next time.</p>
+              <p className="mt-4 text-base text-stone-300">Your spot is saved. Tap Today to pick up where you left off.</p>
             ) : null}
             {summary.pageId ? (
               <PageStep
@@ -567,16 +566,12 @@ function App() {
               onStartPage={startPage}
               onStartPick={(words) => openSession('pick', 'Your picked words', startQueue(words))}
               onStartBee={startBee}
-              resume={resume && resume.pageId !== today ? { label: resume.label, left: wordsLeft(resume.queue) } : null}
               tests={tests}
               today={today}
               todayNext={todayNext()}
               onToday={() => studyToday()}
               onStartPageTest={startPageTest}
               onStartPageQuiz={startPageQuiz}
-              onResume={() => {
-                if (resume) openSession(resume.kind, resume.label, resume.queue, resume.stars)
-              }}
               book={book}
               onPractice={() => startPractice(book.practice)}
               onPlayFamily={() => {

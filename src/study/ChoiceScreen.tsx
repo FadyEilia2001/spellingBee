@@ -33,7 +33,6 @@ const LINE_FOR_STEP: Record<Exclude<Step, 'scope' | 'pick'>, LineId> = {
 
 const BEE_TIERS: BeeTier[] = ['One Bee', 'Two Bee', 'Three Bee']
 
-export type ResumeOffer = { label: string; left: number }
 
 export function ChoiceScreen({
   onStartRound,
@@ -41,8 +40,6 @@ export function ChoiceScreen({
   onStartPick,
   onStartBee = () => {},
   onPlayFamily,
-  resume = null,
-  onResume = () => {},
   book = { learned: [], practice: [] },
   onPractice = () => {},
   tests = {},
@@ -57,8 +54,6 @@ export function ChoiceScreen({
   onStartPick: (words: string[]) => void
   onStartBee?: (tier: BeeTier, count: RoundCount) => void
   onPlayFamily: () => void
-  resume?: ResumeOffer | null
-  onResume?: () => void
   book?: WordBook
   onPractice?: () => void
   tests?: PageTests
@@ -110,16 +105,6 @@ export function ChoiceScreen({
                 🎉 All six pages are done!
               </p>
             )}
-            {resume ? (
-              <button
-                type="button"
-                className={`${touchTarget} w-full rounded-2xl border border-amber-300/40 bg-amber-400/15 px-4 py-2 text-lg font-semibold text-amber-100`}
-                onClick={onResume}
-              >
-                Keep going: {resume.label}
-                <span className="block text-sm font-medium">{resume.left} {resume.left === 1 ? 'word' : 'words'} left</span>
-              </button>
-            ) : null}
             <button type="button" className={choiceButton} onClick={() => setStep('page')}>
               Study a page
             </button>

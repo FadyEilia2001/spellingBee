@@ -389,12 +389,13 @@ describe('saved study rounds', () => {
     stopSpeaking.mockClear()
   })
 
-  it('keeps stars and resumes the round after a reload', async () => {
+  it('keeps stars and picks today’s page back up after a reload', async () => {
     const user = userEvent.setup()
     const first = render(<App />)
-    await startShortRound(user)
+    await user.click(screen.getByTestId('today-button'))
+    expect(screen.getByText('Page 1 · Words 1–10')).toBeTruthy()
 
-    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), currentRound().current ?? '')
+    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), 'ran')
     await user.click(screen.getByRole('button', { name: /^submit$/i }))
     expect(screen.getByTestId('total-stars').textContent).toBe('3')
     expect(screen.getByTestId('current-streak').textContent).toBe('1')
@@ -403,16 +404,15 @@ describe('saved study rounds', () => {
     first.unmount()
     render(<App />)
 
-    expect(screen.getByText('Hi Ella, choose your adventure.')).toBeTruthy()
     expect(screen.getByTestId('total-stars').textContent).toBe('3')
-    await user.click(screen.getByRole('button', { name: /keep going: short quiz/i }))
-    expect(screen.getByTestId('clean-count').textContent).toBe('1 of 5')
-    const next = finishTurn(currentRound(), true).current ?? ''
-    expect(screen.getAllByTestId('letter-slot')).toHaveLength(Array.from(next).length)
-    expect(screen.getByTestId('current-streak').textContent).toBe('1')
+    expect(screen.queryByRole('button', { name: /keep going/i })).toBeNull()
+    expect(screen.getByTestId('today-button').textContent).toMatch(/Pick up where you left off/)
+    await user.click(screen.getByTestId('today-button'))
+    expect(screen.getByTestId('memorized-count').textContent).toBe('1')
+    expect(screen.getAllByTestId('letter-slot')).toHaveLength(3)
   })
 
-  it('stops for now, saves the spot, and lists the word to practice', async () => {
+  it('ends a quiz for now without saving it, and keeps the missed word to practice', async () => {
     const user = userEvent.setup()
     render(<App />)
     await startShortRound(user)
@@ -426,16 +426,12 @@ describe('saved study rounds', () => {
     await user.click(screen.getByRole('button', { name: /yes, stop here/i }))
 
     expect(screen.getByText('Nice work for now')).toBeTruthy()
+    expect(screen.queryByText(/your spot is saved/i)).toBeNull()
     expect(screen.getByRole('list', { name: /still practicing/i }).textContent).toBe(missed)
     await user.click(screen.getByRole('button', { name: /back to study choices/i }))
-    expect(screen.getByRole('button', { name: /keep going: short quiz/i }).textContent).toMatch(/5 words left/)
-    await user.click(screen.getByRole('button', { name: /my practice words \(1\)/i }))
-    expect(screen.getByText('My practice words')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: /i'm done for now/i }))
-    await user.click(screen.getByRole('button', { name: /yes, stop here/i }))
-    expect(screen.queryByText(/your spot is saved/i)).toBeNull()
-    await user.click(screen.getByRole('button', { name: /back to study choices/i }))
-    expect(screen.getByRole('button', { name: /keep going: short quiz/i })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /keep going/i })).toBeNull()
+    expect(screen.getByTestId('today-button').textContent).toMatch(/Next: Words 1–10/)
+    expect(screen.getByRole('button', { name: /my practice words \(1\)/i })).toBeTruthy()
   })
 
   it('fills in a hyphen for her', async () => {

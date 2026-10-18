@@ -48,6 +48,6 @@ _Avoid_: mastered
 Words she missed and has not spelled cleanly since. A learned word stays learned.
 _Avoid_: mistakes, wrong words
 
-**Keep going**:
-Picking up a paused lesson, round or Bee mode where she left off. A practice run is never paused this way.
-_Avoid_: resume, continue
+**Today's page**:
+The first page that is not done yet. Only work on today's page is saved to pick up later, from the Today button; quizzes, Bee mode and practice runs just end.
+_Avoid_: daily page, current page
