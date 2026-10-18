@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DUCKED_VOLUME, TUNE_VOLUME } from "./lines.ts";
 import { resetSoundtrack, startTune, tuneVolume } from "./soundtrack.ts";
-import { speakWord, stopSpeaking, SPEECH_RATE } from "./speech.ts";
+import { peakAmplitude, speakWord, stopSpeaking, SPEECH_RATE, type CheckAudio } from "./speech.ts";
 
 class SpeechSynthesisUtteranceStub {
   text: string;
@@ -47,6 +47,7 @@ class FakeAudio {
 }
 
 let playImpl: () => Promise<void> = () => Promise.resolve();
+const audible: CheckAudio = async () => "ok";
 
 beforeEach(() => {
   resetSoundtrack();
@@ -88,7 +89,7 @@ describe("pronunciation", () => {
     expect(FakeAudio.instances).toHaveLength(0);
     expect(spoken).toHaveLength(0);
 
-    speakWord("mist", synth);
+    speakWord("mist", synth, audible);
     await flush();
 
     expect(FakeAudio.instances.map((audio) => audio.src)).toEqual(["/audio/mist.mp3"]);
@@ -103,7 +104,7 @@ describe("pronunciation", () => {
       },
     });
 
-    speakWord("bioluminescence", synth);
+    speakWord("bioluminescence", synth, audible);
     await flush();
 
     expect(FakeAudio.instances.map((audio) => audio.src)).toEqual([
@@ -121,13 +122,48 @@ describe("pronunciation", () => {
       },
     });
 
-    speakWord("bioluminescence", synth);
+    speakWord("bioluminescence", synth, audible);
     await flush();
 
     expect(spoken).toHaveLength(1);
     expect(spoken[0]?.text).toBe("bioluminescence");
     expect(spoken[0]?.rate).toBe(SPEECH_RATE);
     expect(SPEECH_RATE).toBeCloseTo(0.82);
+  });
+
+  it("falls back to browser speech when the mp3 is effectively silent", async () => {
+    const spoken: SpeechSynthesisUtterance[] = [];
+    const synth = mockSynth({
+      speak: (utterance) => {
+        spoken.push(utterance);
+      },
+    });
+
+    speakWord("peach", synth, async () => "unusable");
+    await flush();
+
+    expect(FakeAudio.instances).toHaveLength(0);
+    expect(spoken).toHaveLength(1);
+    expect(spoken[0]?.text).toBe("peach");
+    expect(spoken[0]?.rate).toBe(SPEECH_RATE);
+  });
+
+  it("falls back when the file errors after play() already resolved", async () => {
+    const spoken: SpeechSynthesisUtterance[] = [];
+    const synth = mockSynth({
+      speak: (utterance) => {
+        spoken.push(utterance);
+      },
+    });
+
+    speakWord("peach", synth, audible);
+    await flush();
+    expect(spoken).toHaveLength(0);
+
+    FakeAudio.instances[0]?.dispatch("error");
+    await flush();
+
+    expect(spoken.map((utterance) => utterance.text)).toEqual(["peach"]);
   });
 
   it("falls back only once when loading fails twice", async () => {
@@ -139,7 +175,8 @@ describe("pronunciation", () => {
       },
     });
 
-    speakWord("mist", synth);
+    speakWord("mist", synth, audible);
+    await flush();
     FakeAudio.instances[0]?.dispatch("error");
     await flush();
 
@@ -168,17 +205,19 @@ describe("pronunciation", () => {
       getVoices: () => [],
     } as SpeechSynthesis;
 
-    speakWord("rabbit", synth);
+    speakWord("rabbit", synth, audible);
     await flush();
 
     expect(events).toEqual(["cancel", "speak:rabbit"]);
   });
 
-  it("stops generated audio before pronouncing another word", () => {
+  it("stops generated audio before pronouncing another word", async () => {
     const synth = mockSynth();
 
-    speakWord("mist", synth);
-    speakWord("rabbit", synth);
+    speakWord("mist", synth, audible);
+    await flush();
+    speakWord("rabbit", synth, audible);
+    await flush();
 
     expect(FakeAudio.instances[0]?.paused).toBe(true);
     expect(FakeAudio.instances[0]?.src).toBe("");
@@ -198,8 +237,8 @@ describe("pronunciation", () => {
       },
     });
 
-    speakWord("mist", synth);
-    await Promise.resolve();
+    speakWord("mist", synth, audible);
+    await flush();
     stopSpeaking(synth);
     rejectPlay(new Error("aborted"));
     await flush();
@@ -211,7 +250,7 @@ describe("pronunciation", () => {
   it("ducks the tune while the spelling word plays", async () => {
     startTune();
     await flush();
-    speakWord("mist", mockSynth());
+    speakWord("mist", mockSynth(), audible);
     await flush();
 
     expect(tuneVolume()).toBe(DUCKED_VOLUME);
@@ -222,10 +261,24 @@ describe("pronunciation", () => {
   it("restores the tune when pronunciation is stopped", async () => {
     startTune();
     await flush();
-    speakWord("mist", mockSynth());
+    speakWord("mist", mockSynth(), audible);
     await flush();
     stopSpeaking(mockSynth());
 
     expect(tuneVolume()).toBe(TUNE_VOLUME);
+  });
+
+  it("treats near-zero samples as silent audio", () => {
+    const silent = {
+      numberOfChannels: 1,
+      getChannelData: () => new Float32Array([0, 0.001, -0.002, 0]),
+    } as AudioBuffer;
+    const loud = {
+      numberOfChannels: 1,
+      getChannelData: () => new Float32Array([0, 0.4, -0.5, 0.1]),
+    } as AudioBuffer;
+
+    expect(peakAmplitude(silent)).toBeLessThan(0.01);
+    expect(peakAmplitude(loud)).toBeGreaterThan(0.01);
   });
 });

@@ -1,4 +1,5 @@
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { access, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { ALL_SPELLING_WORDS } from '../src/data/words.ts'
 import { spellingAudioFilename } from '../src/study/audioFile.ts'
@@ -11,6 +12,8 @@ const COACH =
   'You are a warm, enthusiastic spelling coach talking to a child. Speak clearly in American English, with a smile. Say only the words you are given.'
 
 const root = path.resolve(import.meta.dirname, '..')
+const MIN_MEAN_DB = -50
+const MIN_MAX_DB = -40
 
 type Job = {
   text: string
@@ -39,8 +42,18 @@ async function exists(file: string): Promise<boolean> {
   }
 }
 
-async function synthesize(key: string, job: Job): Promise<'skipped' | 'written'> {
-  if (await exists(job.destination)) return 'skipped'
+function loudEnough(file: string): boolean {
+  const result = spawnSync('ffmpeg', ['-i', file, '-af', 'volumedetect', '-f', 'null', '-'], {
+    encoding: 'utf8',
+  })
+  const stderr = result.stderr ?? ''
+  const mean = Number(/mean_volume:\s*([-\d.]+)/.exec(stderr)?.[1])
+  const max = Number(/max_volume:\s*([-\d.]+)/.exec(stderr)?.[1])
+  return Number.isFinite(mean) && Number.isFinite(max) && mean >= MIN_MEAN_DB && max >= MIN_MAX_DB
+}
+
+async function synthesize(key: string, job: Job, force: boolean): Promise<'skipped' | 'written'> {
+  if (!force && (await exists(job.destination))) return 'skipped'
   const response = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST',
     headers: {
@@ -60,10 +73,14 @@ async function synthesize(key: string, job: Job): Promise<'skipped' | 'written'>
   }
   await mkdir(path.dirname(job.destination), { recursive: true })
   await writeFile(job.destination, Buffer.from(await response.arrayBuffer()))
+  if (!loudEnough(job.destination)) {
+    await unlink(job.destination)
+    throw new Error(`${job.destination} was too quiet after synthesis`)
+  }
   return 'written'
 }
 
-function jobs(): Job[] {
+function jobs(only: string[]): Job[] {
   const wordJobs = ALL_SPELLING_WORDS.map((word) => ({
     text: word,
     voice: 'marin' as const,
@@ -76,12 +93,21 @@ function jobs(): Job[] {
     instructions: COACH,
     destination: path.join(root, 'public', LINES[id].url.slice(1)),
   }))
-  return [...wordJobs, ...lineJobs]
+  const all = [...wordJobs, ...lineJobs]
+  if (only.length === 0) return all
+  const wanted = new Set(only.map((entry) => entry.toLowerCase()))
+  return all.filter((job) => wanted.has(job.text.toLowerCase()))
 }
 
 async function main(): Promise<void> {
+  const args = process.argv.slice(2)
+  const force = args.includes('--force')
+  const only = args.filter((arg) => arg !== '--force')
   const key = await loadKey()
-  const pending = jobs()
+  const pending = jobs(only)
+  if (only.length > 0 && pending.length === 0) {
+    throw new Error(`No audio jobs matched: ${only.join(', ')}`)
+  }
   let cursor = 0
   let written = 0
   let skipped = 0
@@ -93,7 +119,7 @@ async function main(): Promise<void> {
       cursor += 1
       if (!job) return
       try {
-        const result = await synthesize(key, job)
+        const result = await synthesize(key, job, force)
         if (result === 'written') written += 1
         else skipped += 1
       } catch (error) {

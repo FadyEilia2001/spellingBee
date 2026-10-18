@@ -2,6 +2,10 @@ import { spellingAudioUrl } from "./audioFile.ts";
 import { duckTune, stopLine, unduckTune } from "./soundtrack.ts";
 
 export const SPEECH_RATE = 0.82;
+export const MIN_AUDIO_PEAK = 0.01;
+
+export type AudioHealth = "ok" | "unusable";
+export type CheckAudio = (url: string) => Promise<AudioHealth>;
 
 let activeUtterance: SpeechSynthesisUtterance | null = null;
 let currentAudio: HTMLAudioElement | null = null;
@@ -30,6 +34,9 @@ function englishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | un
 function silenceAudio(audio: HTMLAudioElement | null): void {
   if (!audio) return;
   audio.pause();
+  if (audio.src.startsWith("blob:")) {
+    URL.revokeObjectURL(audio.src);
+  }
   audio.src = "";
 }
 
@@ -60,33 +67,56 @@ function speakText(text: string, rate: number, synth: SpeechSynthesis): void {
   synth.speak(utterance);
 }
 
-export function speakWord(
-  word: string,
-  synth: SpeechSynthesis = window.speechSynthesis,
-): void {
-  const pronunciation = ++pronunciationId;
-  stopLine();
-  releaseWordDuck();
-  silenceAudio(currentAudio);
-
-  if (synth.speaking || synth.pending) {
-    synth.cancel();
+export function peakAmplitude(buffer: AudioBuffer): number {
+  let peak = 0;
+  for (let channel = 0; channel < buffer.numberOfChannels; channel += 1) {
+    const data = buffer.getChannelData(channel);
+    for (let index = 0; index < data.length; index += 1) {
+      const sample = Math.abs(data[index] ?? 0);
+      if (sample > peak) peak = sample;
+    }
   }
+  return peak;
+}
 
+export async function checkSpellingAudio(url: string): Promise<AudioHealth> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return "unusable";
+    const bytes = await response.arrayBuffer();
+    const context = new AudioContext();
+    try {
+      const decoded = await context.decodeAudioData(bytes.slice(0));
+      return peakAmplitude(decoded) >= MIN_AUDIO_PEAK ? "ok" : "unusable";
+    } finally {
+      void context.close();
+    }
+  } catch {
+    return "unusable";
+  }
+}
+
+function playGeneratedAudio(
+  word: string,
+  url: string,
+  pronunciation: number,
+  synth: SpeechSynthesis,
+): void {
   let audio: HTMLAudioElement;
   try {
-    audio = new Audio(spellingAudioUrl(word));
+    audio = new Audio(url);
   } catch {
     speakText(word, SPEECH_RATE, synth);
     return;
   }
 
   currentAudio = audio;
-  let settled = false;
+  let usedFallback = false;
 
   const fallback = () => {
-    if (settled || pronunciation !== pronunciationId || currentAudio !== audio) return;
-    settled = true;
+    if (usedFallback || pronunciation !== pronunciationId || currentAudio !== audio) return;
+    usedFallback = true;
+    silenceAudio(audio);
     currentAudio = null;
     speakText(word, SPEECH_RATE, synth);
   };
@@ -103,11 +133,36 @@ export function speakWord(
         audio.pause();
         return;
       }
-      settled = true;
       holdWordDuck();
     },
     fallback,
   );
+}
+
+export function speakWord(
+  word: string,
+  synth: SpeechSynthesis = window.speechSynthesis,
+  checkAudio: CheckAudio = checkSpellingAudio,
+): void {
+  const pronunciation = ++pronunciationId;
+  const url = spellingAudioUrl(word);
+  stopLine();
+  releaseWordDuck();
+  silenceAudio(currentAudio);
+  currentAudio = null;
+
+  if (synth.speaking || synth.pending) {
+    synth.cancel();
+  }
+
+  void checkAudio(url).then((health) => {
+    if (pronunciation !== pronunciationId) return;
+    if (health === "unusable") {
+      speakText(word, SPEECH_RATE, synth);
+      return;
+    }
+    playGeneratedAudio(word, url, pronunciation, synth);
+  });
 }
 
 export function stopSpeaking(synth: SpeechSynthesis = window.speechSynthesis): void {
