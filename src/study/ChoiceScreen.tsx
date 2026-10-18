@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { StudyPageId } from '../data/pages.ts'
-import { STUDY_PAGES } from '../data/pages.ts'
+import { STUDY_PAGES, wordsForPage, type StudyPageId } from '../data/pages.ts'
 import {
   DIFFICULTIES,
   ROUND_COUNTS,
@@ -8,7 +7,8 @@ import {
   type RoundCount,
 } from './difficulty.ts'
 import { type LineId } from './lines.ts'
-import { playLine } from './soundtrack.ts'
+import { playLine, stopLine } from './soundtrack.ts'
+import { WordPick } from './WordPick.tsx'
 
 const touchTarget =
   'min-h-[52px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200'
@@ -16,9 +16,9 @@ const touchTarget =
 const prompt = 'text-center text-xl font-semibold leading-snug text-stone-50'
 const choiceButton = `${touchTarget} w-full rounded-2xl border border-white/10 bg-white/5 px-4 text-lg font-semibold text-stone-100`
 
-type Step = 'adventure' | 'page' | 'difficulty' | 'count'
+type Step = 'adventure' | 'page' | 'scope' | 'pick' | 'difficulty' | 'count'
 
-const LINE_FOR_STEP: Record<Step, LineId> = {
+const LINE_FOR_STEP: Record<Exclude<Step, 'scope' | 'pick'>, LineId> = {
   adventure: 'adventure',
   page: 'page',
   difficulty: 'difficulty',
@@ -28,14 +28,21 @@ const LINE_FOR_STEP: Record<Step, LineId> = {
 export function ChoiceScreen({
   onStartRound,
   onStartPage,
+  onStartPick,
 }: {
   onStartRound: (difficulty: Difficulty, count: RoundCount) => void
   onStartPage: (pageId: StudyPageId) => void
+  onStartPick: (words: string[]) => void
 }) {
   const [step, setStep] = useState<Step>('adventure')
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null)
+  const [pageId, setPageId] = useState<StudyPageId>(STUDY_PAGES[0].id)
 
   useEffect(() => {
+    if (step === 'scope' || step === 'pick') {
+      stopLine()
+      return
+    }
     if (step === 'count' && difficulty === null) return
     playLine(LINE_FOR_STEP[step])
   }, [step, difficulty])
@@ -66,7 +73,10 @@ export function ChoiceScreen({
                 key={page.id}
                 type="button"
                 className={choiceButton}
-                onClick={() => onStartPage(page.id)}
+                onClick={() => {
+                  setPageId(page.id)
+                  setStep('scope')
+                }}
               >
                 {page.label}
               </button>
@@ -74,6 +84,25 @@ export function ChoiceScreen({
           </div>
           <Back onClick={() => setStep('adventure')} />
         </>
+      ) : null}
+
+      {step === 'scope' ? (
+        <>
+          <p className={prompt}>Select words or study the whole page.</p>
+          <div className="mt-4 grid gap-3">
+            <button type="button" className={choiceButton} onClick={() => setStep('pick')}>
+              Select words
+            </button>
+            <button type="button" className={choiceButton} onClick={() => onStartPage(pageId)}>
+              Study the whole page
+            </button>
+          </div>
+          <Back onClick={() => setStep('page')} />
+        </>
+      ) : null}
+
+      {step === 'pick' ? (
+        <WordPick words={wordsForPage(pageId)} onPlay={onStartPick} onBack={() => setStep('scope')} />
       ) : null}
 
       {step === 'difficulty' ? (

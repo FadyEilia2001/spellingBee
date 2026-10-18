@@ -31,7 +31,7 @@ The words on a welcome screen are the words in its recording. The adventure scre
 | Difficulty | Please select the difficulty of your quiz. | That sentence |
 | Word count | How many words would you like? | That sentence |
 
-The buttons stay Study a page, Quiz, Page 1 through Page 6, Short, Medium, Long, 5 words, 10 words, and 15 words. Choosing a word count still starts the round. Choosing a page still starts that page lesson. Back still returns to the previous screen.
+The buttons stay Study a page, Quiz, Page 1 through Page 6, Short, Medium, Long, 5 words, 10 words, and 15 words. Choosing a word count still starts the round. Choosing a page opens the screen in docs/superpowers/specs/2026-10-18-word-pick-design.md. Back still returns to the previous screen.
 
 Each line plays once when its screen appears. Back, or any other move to a different welcome screen, stops the line that is playing and plays the line for the screen she landed on. A line that has already finished does not replay while she stays on that screen. A line that the browser blocked is not finished, so the first tap or key press may play it.
 

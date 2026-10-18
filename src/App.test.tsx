@@ -25,6 +25,7 @@ afterEach(() => {
 const speakWord = vi.fn()
 const stopSpeaking = vi.fn()
 const playLine = vi.fn()
+const stopLine = vi.fn()
 const playEffect = vi.fn()
 const pauseTune = vi.fn()
 const resumeTune = vi.fn()
@@ -38,6 +39,7 @@ vi.mock('./study/speech.ts', () => ({
 
 vi.mock('./study/soundtrack.ts', () => ({
   playLine: (...args: unknown[]) => playLine(...args),
+  stopLine: (...args: unknown[]) => stopLine(...args),
   playEffect: (...args: unknown[]) => playEffect(...args),
   pauseTune: () => {
     musicPreference = 'paused'
@@ -105,11 +107,76 @@ describe('choice screen', () => {
 
     await user.click(screen.getByRole('button', { name: 'Study a page' }))
     await user.click(screen.getByRole('button', { name: 'Page 1' }))
+    await user.click(screen.getByRole('button', { name: 'Study the whole page' }))
 
-    expect(screen.getByTestId('clean-count').textContent).toBe('0 of 76')
+    expect(screen.getByTestId('memorized-count').textContent).toBe('0')
+    expect(screen.getByTestId('remaining-count').textContent).toBe('76')
+    expect(screen.queryByTestId('clean-count')).toBeNull()
     expect(screen.getAllByTestId('letter-slot')).toHaveLength(3)
     await user.click(screen.getByRole('button', { name: /hear word/i }))
     expect(speakWord).toHaveBeenCalledWith('ran')
+  })
+
+  it('counts a page word as memorized only when the first try is right', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Study a page' }))
+    await user.click(screen.getByRole('button', { name: 'Page 1' }))
+    await user.click(screen.getByRole('button', { name: 'Study the whole page' }))
+
+    const input = screen.getByRole('textbox', { name: /spelling guess/i })
+    await user.type(input, 'ran')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    expect(screen.getByTestId('memorized-count').textContent).toBe('1')
+    expect(screen.getByTestId('remaining-count').textContent).toBe('75')
+
+    await user.click(screen.getByRole('button', { name: /next word/i }))
+    await user.type(input, 'xyz')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    await user.type(input, 'rod')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    expect(screen.getByTestId('memorized-count').textContent).toBe('1')
+    expect(screen.getByTestId('remaining-count').textContent).toBe('75')
+  })
+
+  it('starts a word pick in page order and brings a miss back', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: 'Study a page' }))
+    await user.click(screen.getByRole('button', { name: 'Page 2' }))
+    await user.click(screen.getByRole('button', { name: 'Select words' }))
+    await user.click(screen.getByRole('button', { name: 'half' }))
+    await user.click(screen.getByRole('button', { name: 'cabin' }))
+    stopLine.mockClear()
+    await user.click(screen.getByRole('button', { name: 'Play' }))
+
+    expect(stopLine).toHaveBeenCalled()
+    expect(screen.getByTestId('memorized-count').textContent).toBe('0')
+    expect(screen.getByTestId('remaining-count').textContent).toBe('2')
+    expect(screen.queryByTestId('clean-count')).toBeNull()
+    expect(screen.getAllByTestId('letter-slot')).toHaveLength(5)
+    await user.click(screen.getByRole('button', { name: /hear word/i }))
+    expect(speakWord).toHaveBeenCalledWith('cabin')
+
+    const input = screen.getByRole('textbox', { name: /spelling guess/i })
+    for (const guess of ['xxxxx', 'yyyyy', 'zzzzz']) {
+      await user.type(input, guess)
+      await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    }
+    await user.click(screen.getByRole('button', { name: /next word/i }))
+
+    expect(screen.getAllByTestId('letter-slot')).toHaveLength(4)
+    await user.type(input, 'half')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    expect(screen.getByTestId('memorized-count').textContent).toBe('1')
+    expect(screen.getByTestId('remaining-count').textContent).toBe('1')
+
+    await user.click(screen.getByRole('button', { name: /next word/i }))
+    expect(screen.getAllByTestId('letter-slot')).toHaveLength(5)
+    await user.click(screen.getByRole('button', { name: /hear word/i }))
+    expect(speakWord).toHaveBeenLastCalledWith('cabin')
   })
 })
 

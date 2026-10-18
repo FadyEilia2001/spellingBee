@@ -31,7 +31,14 @@ import {
 import { maskSentence } from './study/sentenceClue.ts'
 import { speakWord, stopSpeaking } from './study/speech.ts'
 import { readMusicPreference } from './study/lines.ts'
-import { playEffect, playLine, pauseTune, resumeTune, startTune } from './study/soundtrack.ts'
+import {
+  playEffect,
+  playLine,
+  pauseTune,
+  resumeTune,
+  startTune,
+  stopLine,
+} from './study/soundtrack.ts'
 import { slotCount } from './study/wordCycling.ts'
 
 type Attempt = {
@@ -117,6 +124,7 @@ function App() {
   const [sessionStars, setSessionStars] = useState(0)
   const [music, setMusic] = useState(readMusicPreference)
   const [clueOpen, setClueOpen] = useState(false)
+  const [pageLesson, setPageLesson] = useState(false)
   const guessRef = useRef<HTMLInputElement>(null)
 
   const word = queue?.current ?? ''
@@ -127,6 +135,7 @@ function App() {
   const entry = entryForWord(word)
   const pendingClean = queue !== null && recorded && turnIsClean(attempts, word)
   const shownClean = (queue ? cleanCount(queue) : 0) + (pendingClean ? 1 : 0)
+  const remaining = queue ? queue.started.length - shownClean : 0
 
   useEffect(() => {
     startTune()
@@ -138,10 +147,12 @@ function App() {
     playLine('finished')
   }, [summary])
 
-  function openSession(nextQueue: StudyQueue) {
+  function openSession(nextQueue: StudyQueue, page = false) {
     if (nextQueue.current === null) return
     stopSpeaking()
+    stopLine()
     setQueue(nextQueue)
+    setPageLesson(page)
     setAttempts([])
     setRecorded(false)
     setDraft('')
@@ -231,6 +242,7 @@ function App() {
     setDraft('')
     setClueOpen(false)
     setSummary(null)
+    setPageLesson(false)
   }
 
   return (
@@ -327,13 +339,34 @@ function App() {
           </div>
         ) : queue?.current ? (
           <>
-            <p
-              data-testid="clean-count"
-              className="mt-2 text-center text-sm text-stone-400"
-              aria-label={`${shownClean} of ${queue.started.length} words clean`}
-            >
-              {shownClean} of {queue.started.length}
-            </p>
+            {pageLesson ? (
+              <div
+                data-testid="page-progress"
+                className="mt-4 grid grid-cols-2 gap-3"
+                aria-label={`${shownClean} memorized, ${remaining} to go`}
+              >
+                <p className="rounded-2xl border border-green-400/25 bg-[#0e1210] px-3 py-3 text-center">
+                  <span data-testid="memorized-count" className="block font-serif text-4xl text-green-400">
+                    {shownClean}
+                  </span>
+                  <span className="mt-1 block text-sm font-semibold text-stone-300">memorized</span>
+                </p>
+                <p className="rounded-2xl border border-white/10 bg-[#0e1210] px-3 py-3 text-center">
+                  <span data-testid="remaining-count" className="block font-serif text-4xl text-amber-200">
+                    {remaining}
+                  </span>
+                  <span className="mt-1 block text-sm font-semibold text-stone-300">to go</span>
+                </p>
+              </div>
+            ) : (
+              <p
+                data-testid="clean-count"
+                className="mt-2 text-center text-sm text-stone-400"
+                aria-label={`${shownClean} of ${queue.started.length} words clean`}
+              >
+                {shownClean} of {queue.started.length}
+              </p>
+            )}
 
             <form onSubmit={submitGuess} className="mt-8">
               <label htmlFor="spelling-guess" className="sr-only">
@@ -474,7 +507,8 @@ function App() {
         ) : (
           <ChoiceScreen
             onStartRound={startDifficultyRound}
-            onStartPage={(pageId) => openSession(startQueue(wordsForPage(pageId)))}
+            onStartPage={(pageId) => openSession(startQueue(wordsForPage(pageId)), true)}
+            onStartPick={(words) => openSession(startQueue(words), true)}
           />
         )}
       </section>
