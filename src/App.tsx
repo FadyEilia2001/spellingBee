@@ -4,7 +4,20 @@ import { Flame, Star, Volume2, VolumeX } from 'lucide-react'
 import { ALL_SPELLING_WORDS, SPELLING_ENTRIES, type BeeTier } from './data/words.ts'
 import { STUDY_PAGES, wordsForPage, type StudyPageId } from './data/pages.ts'
 import { DIFFICULTIES, wordsForDifficulty, type Difficulty, type RoundCount } from './study/difficulty.ts'
-import { ChoiceScreen, SET_SIZE, setsOf } from './study/ChoiceScreen.tsx'
+import { ChoiceScreen } from './study/ChoiceScreen.tsx'
+import {
+  lastWarmupDay,
+  loadPageTests,
+  markWarmup,
+  pageStatus,
+  savePageTests,
+  SET_SIZE,
+  setsOf,
+  todaysPage,
+  warmupWords,
+  type PageTests,
+} from './study/pagePlan.ts'
+import { PageProgress } from './study/PageProgress.tsx'
 import {
   connectFamilyRoom,
   FamilyMatch,
@@ -32,7 +45,7 @@ import {
   type StudyQueue,
 } from './study/queue.ts'
 import { clearSession, loadSession, saveSession, wordsLeft, type SavedSession, type SessionKind } from './study/savedSession.ts'
-import { dayStreak, loadDays, recordWord, saveDays } from './study/daily.ts'
+import { dayStreak, loadDays, localDay, recordWord, saveDays } from './study/daily.ts'
 import { loadBook, noteWord, saveBook } from './study/learned.ts'
 import { stopSpeaking } from './study/speech.ts'
 import { readMusicPreference } from './study/lines.ts'
@@ -56,6 +69,9 @@ type SessionSummary = {
   practicing: string[]
   complete: boolean
   saved: boolean
+  kind: SessionKind
+  pageId?: StudyPageId
+  test?: { score: number; total: number }
 }
 
 // The result of the turn on screen, held until she taps Next.
@@ -63,9 +79,14 @@ type FinishedTurn = { next: StudyQueue; stars: number }
 
 const PRACTICE_SIZE = 10
 
-// A short practice run never replaces the paused lesson she can keep going on.
+// A short practice run or warm-up never replaces the paused lesson she can keep going on.
 function keepsSpot(kind: SessionKind): boolean {
-  return kind !== 'practice'
+  return kind !== 'practice' && kind !== 'warmup'
+}
+
+// One try per word, and a miss doesn't come back in the same session.
+function oneTry(kind: SessionKind): boolean {
+  return kind === 'bee' || kind === 'pageTest'
 }
 
 function streakLabel(streak: number): string {
@@ -84,6 +105,7 @@ function App() {
   const [progress, setProgress] = useState<Progress>(loadProgress)
   const [book, setBook] = useState(loadBook)
   const [days, setDays] = useState(loadDays)
+  const [tests, setTests] = useState<PageTests>(loadPageTests)
   const [session, setSession] = useState<SavedSession | null>(null)
   const [turn, setTurn] = useState<FinishedTurn | null>(null)
   const [summary, setSummary] = useState<SessionSummary | null>(null)
@@ -146,15 +168,16 @@ function App() {
   const queue = turn?.next ?? session?.queue ?? null
   const word = session?.queue.current ?? ''
   const shownClean = queue ? cleanCount(queue) : 0
-  const listLesson = session !== null && session.kind !== 'round' && session.kind !== 'bee'
+  const listLesson = session !== null && session.kind !== 'round' && !oneTry(session.kind)
+  const today = todaysPage(book, tests)
   const remaining = queue ? queue.started.length - shownClean : 0
   const streakDays = dayStreak(days)
 
-  function openSession(kind: SessionKind, label: string, nextQueue: StudyQueue, stars = 0) {
+  function openSession(kind: SessionKind, label: string, nextQueue: StudyQueue, stars = 0, pageId?: StudyPageId) {
     if (nextQueue.current === null) return
     stopSpeaking()
     stopLine()
-    const next = { kind, label, queue: nextQueue, stars }
+    const next: SavedSession = { kind, label, queue: nextQueue, stars, ...(pageId ? { pageId } : {}) }
     if (keepsSpot(kind)) saveSession(next)
     setSession(next)
     setTurn(null)
@@ -170,12 +193,48 @@ function App() {
   function startPage(pageId: StudyPageId, set?: number) {
     const words = wordsForPage(pageId)
     if (set === undefined) {
-      openSession('page', pageLabel(pageId), startQueue(words))
+      openSession('page', pageLabel(pageId), startQueue(words), 0, pageId)
       return
     }
     const first = set * SET_SIZE + 1
     const chosen = setsOf(words)[set] ?? []
-    openSession('page', `${pageLabel(pageId)} · Words ${first}–${first + chosen.length - 1}`, startQueue(chosen))
+    openSession('page', `${pageLabel(pageId)} · Words ${first}–${first + chosen.length - 1}`, startQueue(chosen), 0, pageId)
+  }
+
+  function startPageTest(pageId: StudyPageId) {
+    const words = wordsForPage(pageId)
+    openSession('pageTest', `${pageLabel(pageId)} test`, startRound(words, words.length), 0, pageId)
+  }
+
+  // Today's page, one step at a time: pick up a paused session on it, else the
+  // daily warm-up, else the next unfinished set, else the page test.
+  function studyToday(skipWarmup = false) {
+    if (!today) return
+    const saved = loadSession()
+    if (saved?.pageId === today) {
+      openSession(saved.kind, saved.label, saved.queue, saved.stars, saved.pageId)
+      return
+    }
+    const warm = warmupWords(book, today)
+    if (!skipWarmup && warm.length > 0 && lastWarmupDay() !== localDay()) {
+      markWarmup(localDay())
+      openSession('warmup', 'Warm-up from earlier pages', startQueue(warm), 0, today)
+      return
+    }
+    const next = pageStatus(today, book, tests).nextSet
+    if (next === null) startPageTest(today)
+    else startPage(today, next)
+  }
+
+  function todayNext(): string {
+    if (!today) return ''
+    if (loadSession()?.pageId === today) return 'Pick up where you left off'
+    if (warmupWords(book, today).length > 0 && lastWarmupDay() !== localDay()) return 'Warm-up first, then the next set'
+    const next = pageStatus(today, book, tests).nextSet
+    if (next === null) return 'Take the page test'
+    const first = next * SET_SIZE + 1
+    const size = setsOf(wordsForPage(today))[next]?.length ?? SET_SIZE
+    return `Next: Words ${first}–${first + size - 1}`
   }
 
   function startBee(tier: BeeTier, count: RoundCount) {
@@ -201,7 +260,7 @@ function App() {
     setDays(nextDays)
 
     const next =
-      session.kind === 'bee'
+      oneTry(session.kind)
         ? solved
           ? finishTurn(session.queue, true)
           : dropTurn(session.queue)
@@ -217,6 +276,15 @@ function App() {
   function endSession(finished: StudyQueue, stars: number) {
     const complete = isSessionComplete(finished)
     const tally = sessionTally(finished)
+    const test =
+      complete && session?.kind === 'pageTest' && session.pageId
+        ? { score: tally.cleanOnFirstAppearance, total: tally.started }
+        : null
+    if (test && session?.pageId) {
+      const nextTests = { ...tests, [session.pageId]: test }
+      savePageTests(nextTests)
+      setTests(nextTests)
+    }
     const nextProgress = appendRoundHistory(progress, {
       stars,
       correct: tally.cleanOnFirstAppearance + tally.cleanAfterReturn,
@@ -231,6 +299,9 @@ function App() {
       practicing: wordsToPractice(finished),
       complete,
       saved: !complete && session !== null && keepsSpot(session.kind),
+      kind: session?.kind ?? 'round',
+      pageId: session?.pageId,
+      ...(test ? { test } : {}),
     })
     setSession(null)
     setTurn(null)
@@ -366,6 +437,15 @@ function App() {
             {summary.saved ? (
               <p className="mt-4 text-base text-stone-300">Your spot is saved. Pick “Keep going” next time.</p>
             ) : null}
+            {summary.pageId ? (
+              <PageStep
+                summary={summary}
+                status={pageStatus(summary.pageId, book, tests)}
+                onNextSet={(set) => summary.pageId && startPage(summary.pageId, set)}
+                onTest={() => summary.pageId && startPageTest(summary.pageId)}
+                onOnward={() => studyToday(true)}
+              />
+            ) : null}
             {summary.practicing.length > 0 ? (
               <button
                 type="button"
@@ -405,7 +485,7 @@ function App() {
                   <span className="block text-sm font-semibold text-stone-300">to go</span>
                 </p>
               </div>
-            ) : session.kind === 'bee' ? (
+            ) : oneTry(session.kind) ? (
               <p data-testid="bee-count" className="mt-1 text-center text-sm text-stone-400">
                 Word {session.queue.started.length - wordsLeft(session.queue) + 1} of {session.queue.started.length}
               </p>
@@ -432,6 +512,7 @@ function App() {
                 word={word}
                 onDone={turnDone}
                 onNext={showNextWord}
+                maxAttempts={session.kind === 'pageTest' ? 1 : undefined}
               />
             )}
 
@@ -481,7 +562,12 @@ function App() {
               onStartPage={startPage}
               onStartPick={(words) => openSession('pick', 'Your picked words', startQueue(words))}
               onStartBee={startBee}
-              resume={resume ? { label: resume.label, left: wordsLeft(resume.queue) } : null}
+              resume={resume && resume.pageId !== today ? { label: resume.label, left: wordsLeft(resume.queue) } : null}
+              tests={tests}
+              today={today}
+              todayNext={todayNext()}
+              onToday={() => studyToday()}
+              onStartPageTest={startPageTest}
               onResume={() => {
                 if (resume) openSession(resume.kind, resume.label, resume.queue, resume.stars)
               }}
@@ -504,6 +590,52 @@ function App() {
         )}
       </section>
     </main>
+  )
+}
+
+// The page's progress after a session on it, and the next step on that page.
+function PageStep({
+  summary,
+  status,
+  onNextSet,
+  onTest,
+  onOnward,
+}: {
+  summary: SessionSummary
+  status: ReturnType<typeof pageStatus>
+  onNextSet: (set: number) => void
+  onTest: () => void
+  onOnward: () => void
+}) {
+  const label = pageLabel(status.pageId)
+  const nextSet = status.nextSet
+  const first = (nextSet ?? 0) * SET_SIZE + 1
+  const size = nextSet === null ? 0 : (setsOf(wordsForPage(status.pageId))[nextSet]?.length ?? SET_SIZE)
+  const primary = `${touchTarget} mt-6 w-full rounded-2xl bg-amber-400 px-6 text-xl font-semibold text-[#1c1406]`
+  return (
+    <div className="mx-auto mt-6 max-w-md text-left">
+      {summary.test ? (
+        <p data-testid="page-test-score" className="text-center font-serif text-3xl text-green-300">
+          {label} test: {summary.test.score} / {summary.test.total}
+          {status.done ? <span className="mt-1 block text-lg">🎉 {label} is done!</span> : null}
+        </p>
+      ) : null}
+      <p className="mt-4 text-base font-semibold text-stone-200">{label}</p>
+      <PageProgress status={status} />
+      {summary.saved ? null : summary.kind === 'warmup' ? (
+        <button type="button" className={primary} onClick={onOnward}>
+          On to {label}
+        </button>
+      ) : nextSet !== null ? (
+        <button type="button" className={primary} onClick={() => onNextSet(nextSet)}>
+          Next set: Words {first}–{first + size - 1}
+        </button>
+      ) : summary.kind !== 'pageTest' && !status.done ? (
+        <button type="button" className={primary} onClick={onTest}>
+          Take the page test
+        </button>
+      ) : null}
+    </div>
   )
 }
 

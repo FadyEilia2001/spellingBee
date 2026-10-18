@@ -7,7 +7,9 @@ import {
   type Difficulty,
   type RoundCount,
 } from './difficulty.ts'
-import { learnedCount, type WordBook } from './learned.ts'
+import type { WordBook } from './learned.ts'
+import { pageStatus, SET_SIZE, setsOf, type PageTests } from './pagePlan.ts'
+import { PageProgress } from './PageProgress.tsx'
 import { type LineId } from './lines.ts'
 import { playLine, playTick, stopLine } from './soundtrack.ts'
 import { WordPick } from './WordPick.tsx'
@@ -29,15 +31,7 @@ const LINE_FOR_STEP: Record<Exclude<Step, 'scope' | 'pick'>, LineId> = {
   beeCount: 'count',
 }
 
-export const SET_SIZE = 10
-
 const BEE_TIERS: BeeTier[] = ['One Bee', 'Two Bee', 'Three Bee']
-
-export function setsOf(words: readonly string[]): string[][] {
-  const sets: string[][] = []
-  for (let start = 0; start < words.length; start += SET_SIZE) sets.push(words.slice(start, start + SET_SIZE))
-  return sets
-}
 
 export type ResumeOffer = { label: string; left: number }
 
@@ -51,6 +45,11 @@ export function ChoiceScreen({
   onResume = () => {},
   book = { learned: [], practice: [] },
   onPractice = () => {},
+  tests = {},
+  today = null,
+  todayNext = '',
+  onToday = () => {},
+  onStartPageTest = () => {},
 }: {
   onStartRound: (difficulty: Difficulty, count: RoundCount) => void
   onStartPage: (pageId: StudyPageId, set?: number) => void
@@ -61,12 +60,19 @@ export function ChoiceScreen({
   onResume?: () => void
   book?: WordBook
   onPractice?: () => void
+  tests?: PageTests
+  today?: StudyPageId | null
+  todayNext?: string
+  onToday?: () => void
+  onStartPageTest?: (pageId: StudyPageId) => void
 }) {
   const [step, setStep] = useState<Step>('adventure')
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null)
   const [tier, setTier] = useState<BeeTier | null>(null)
   const [pageId, setPageId] = useState<StudyPageId>(STUDY_PAGES[0].id)
   const learned = new Set(book.learned)
+  const todayStatus = today ? pageStatus(today, book, tests) : null
+  const scopeStatus = pageStatus(pageId, book, tests)
 
   useEffect(() => {
     if (step === 'scope' || step === 'pick') {
@@ -86,10 +92,26 @@ export function ChoiceScreen({
           <p className={prompt}>Hi Ella, choose your adventure.</p>
           <p className={`${prompt} mt-2`}>You can study a page or embark on a quiz.</p>
           <div className="mt-4 grid gap-3">
+            {todayStatus ? (
+              <button
+                type="button"
+                data-testid="today-button"
+                className={`${touchTarget} w-full rounded-2xl bg-amber-400 px-4 py-3 text-left text-xl font-semibold text-[#1c1406]`}
+                onClick={onToday}
+              >
+                Today: {STUDY_PAGES.find((page) => page.id === today)?.label}
+                <span className="block text-base font-medium">{todayNext}</span>
+                <PageProgress status={todayStatus} tone="light" />
+              </button>
+            ) : (
+              <p className="rounded-2xl border border-green-400/40 bg-green-500/10 px-4 py-3 text-center text-lg font-semibold text-green-200">
+                🎉 All six pages are done!
+              </p>
+            )}
             {resume ? (
               <button
                 type="button"
-                className={`${touchTarget} w-full rounded-2xl bg-amber-400 px-4 py-2 text-lg font-semibold text-[#1c1406]`}
+                className={`${touchTarget} w-full rounded-2xl border border-amber-300/40 bg-amber-400/15 px-4 py-2 text-lg font-semibold text-amber-100`}
                 onClick={onResume}
               >
                 Keep going: {resume.label}
@@ -122,27 +144,32 @@ export function ChoiceScreen({
           <p className={prompt}>Select which page you would like to study.</p>
           <div className="mt-4 grid gap-3">
             {STUDY_PAGES.map((page) => {
-              const done = learnedCount(book, wordsForPage(page.id))
+              const status = pageStatus(page.id, book, tests)
+              const isToday = page.id === today
               return (
                 <button
                   key={page.id}
                   type="button"
-                  aria-label={`${page.label}, ${done} of ${page.count} learned`}
-                  className={`${choiceButton} relative overflow-hidden py-2`}
+                  aria-label={`${page.label}, ${status.learned} of ${page.count} learned${status.done ? ', done' : ''}${isToday ? ', today' : ''}`}
+                  className={`${touchTarget} w-full rounded-2xl border px-4 py-3 text-left text-lg font-semibold ${
+                    status.done
+                      ? 'border-green-400/40 bg-green-500/10 text-green-100'
+                      : isToday
+                        ? 'border-amber-300 bg-amber-400/15 text-stone-50'
+                        : 'border-white/10 bg-white/5 text-stone-100'
+                  }`}
                   onClick={() => {
                     setPageId(page.id)
                     setStep('scope')
                   }}
                 >
-                  {page.label}
-                  <span className="block text-sm font-medium text-stone-400">
-                    {done} of {page.count} learned
+                  <span className="flex items-center justify-between">
+                    {page.label}
+                    {isToday ? (
+                      <span className="rounded-full bg-amber-400 px-3 py-0.5 text-sm font-semibold text-[#1c1406]">Today</span>
+                    ) : null}
                   </span>
-                  <span
-                    aria-hidden="true"
-                    className="absolute bottom-0 left-0 h-1 bg-green-400"
-                    style={{ width: `${(done / page.count) * 100}%` }}
-                  />
+                  <PageProgress status={status} />
                 </button>
               )
             })}
@@ -173,6 +200,17 @@ export function ChoiceScreen({
             })}
           </div>
           <div className="mt-3 grid gap-3">
+            {scopeStatus.nextSet === null ? (
+              <button
+                type="button"
+                className={`${touchTarget} w-full rounded-2xl bg-amber-400 px-4 text-lg font-semibold text-[#1c1406]`}
+                onClick={() => onStartPageTest(pageId)}
+              >
+                {scopeStatus.test ? `Retake the page test (last ${scopeStatus.test.score}/${scopeStatus.test.total})` : 'Take the page test'}
+              </button>
+            ) : (
+              <p className="text-center text-sm text-stone-400">The page test opens once every set has a ✓.</p>
+            )}
             <button type="button" className={choiceButton} onClick={() => setStep('pick')}>
               Select words
             </button>

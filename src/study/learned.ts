@@ -1,6 +1,6 @@
 export const WORDS_STORAGE_KEY = 'spellingBee.words'
 
-// learned: spelled cleanly at least once. practice: missed and not learned yet.
+// learned: spelled cleanly at least once. practice: missed since her last clean spelling.
 export type WordBook = { learned: string[]; practice: string[] }
 
 export function emptyBook(): WordBook {
@@ -14,13 +14,8 @@ export function noteWord(book: WordBook, word: string, clean: boolean): WordBook
       practice: book.practice.filter((item) => item !== word),
     }
   }
-  if (book.learned.includes(word) || book.practice.includes(word)) return book
+  if (book.practice.includes(word)) return book
   return { ...book, practice: [...book.practice, word] }
-}
-
-export function learnedCount(book: WordBook, words: readonly string[]): number {
-  const learned = new Set(book.learned)
-  return words.filter((word) => learned.has(word)).length
 }
 
 export function loadBook(): WordBook {

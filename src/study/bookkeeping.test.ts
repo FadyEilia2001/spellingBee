@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { dayStreak, DAY_GOAL, recordWord, type Days } from './daily.ts'
-import { emptyBook, learnedCount, noteWord } from './learned.ts'
+import { emptyBook, noteWord } from './learned.ts'
 import { startQueue } from './queue.ts'
 import { loadSession, saveSession, SESSION_STORAGE_KEY, wordsLeft } from './savedSession.ts'
 
@@ -27,8 +27,7 @@ describe('word book', () => {
     expect(missed.practice).toEqual(['quail'])
     const learned = noteWord(missed, 'quail', true)
     expect(learned).toEqual({ learned: ['quail'], practice: [] })
-    expect(noteWord(learned, 'quail', false)).toBe(learned)
-    expect(learnedCount(learned, ['quail', 'newt'])).toBe(1)
+    expect(noteWord(learned, 'quail', false)).toEqual({ learned: ['quail'], practice: ['quail'] })
   })
 })
 

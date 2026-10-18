@@ -45,7 +45,7 @@ A word she has spelled cleanly at least once, or correctly in Bee mode.
 _Avoid_: mastered
 
 **Practice words**:
-Words she missed that are not learned yet.
+Words she missed and has not spelled cleanly since. A learned word stays learned.
 _Avoid_: mistakes, wrong words
 
 **Keep going**:

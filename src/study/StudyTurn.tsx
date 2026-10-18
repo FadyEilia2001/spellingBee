@@ -37,10 +37,12 @@ export function StudyTurn({
   word,
   onDone,
   onNext,
+  maxAttempts = MAX_ATTEMPTS,
 }: {
   word: string
   onDone: (attemptsUsed: number, solved: boolean) => void
   onNext: () => void
+  maxAttempts?: number
 }) {
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [draft, setDraft] = useState('')
@@ -48,7 +50,7 @@ export function StudyTurn({
   const guessRef = useRef<HTMLInputElement>(null)
   const characters = Array.from(word)
   const solved = attempts.some((attempt) => isSolvedGuess(attempt.guess, word))
-  const failed = !solved && attempts.length >= MAX_ATTEMPTS
+  const failed = !solved && attempts.length >= maxAttempts
   const locked = solved || failed
   const entry = entryForWord(word)
   const size = tileSize(characters.length)
@@ -71,18 +73,18 @@ export function StudyTurn({
     setAttempts(nextAttempts)
     setDraft('')
     // Tapping Submit takes focus off the box; put it back so the keyboard stays up.
-    if (!nowSolved && nextAttempts.length < MAX_ATTEMPTS) guessRef.current?.focus()
+    if (!nowSolved && nextAttempts.length < maxAttempts) guessRef.current?.focus()
 
     if (nowSolved) {
       playEffect('correct')
       playLine('yes')
-    } else if (nextAttempts.length >= MAX_ATTEMPTS) {
+    } else if (nextAttempts.length >= maxAttempts) {
       playEffect('miss')
       speakWord(word)
     } else {
       playLine('tryAgain')
     }
-    if (nowSolved || nextAttempts.length >= MAX_ATTEMPTS) onDone(nextAttempts.length, nowSolved)
+    if (nowSolved || nextAttempts.length >= maxAttempts) onDone(nextAttempts.length, nowSolved)
   }
 
   const lastGuess = attempts.at(-1)?.guess ?? ''
@@ -191,7 +193,7 @@ export function StudyTurn({
       ) : null}
 
       <p className="mt-3 text-center text-sm text-stone-400">
-        {attempts.length} of {MAX_ATTEMPTS} attempts
+        {attempts.length} of {maxAttempts} {maxAttempts === 1 ? 'try' : 'attempts'}
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-3">

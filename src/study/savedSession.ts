@@ -1,17 +1,19 @@
+import { STUDY_PAGES, type StudyPageId } from '../data/pages.ts'
 import type { StudyQueue } from './queue.ts'
 
 export const SESSION_STORAGE_KEY = 'spellingBee.session'
 
-export type SessionKind = 'round' | 'page' | 'pick' | 'practice' | 'bee'
+export type SessionKind = 'round' | 'page' | 'pick' | 'practice' | 'bee' | 'pageTest' | 'warmup'
 
 export type SavedSession = {
   kind: SessionKind
   label: string
   queue: StudyQueue
   stars: number
+  pageId?: StudyPageId
 }
 
-const KINDS: readonly SessionKind[] = ['round', 'page', 'pick', 'practice', 'bee']
+const KINDS: readonly SessionKind[] = ['round', 'page', 'pick', 'practice', 'bee', 'pageTest', 'warmup']
 
 function isWords(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
@@ -56,6 +58,7 @@ export function loadSession(): SavedSession | null {
     if (!KINDS.includes(parsed.kind as SessionKind)) return null
     if (typeof parsed.label !== 'string' || typeof parsed.stars !== 'number') return null
     if (!isQueue(parsed.queue) || parsed.queue.current === null) return null
+    if (parsed.pageId !== undefined && !STUDY_PAGES.some((page) => page.id === parsed.pageId)) return null
     return parsed as SavedSession
   } catch {
     return null

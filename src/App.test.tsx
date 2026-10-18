@@ -3,7 +3,8 @@ import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ALL_SPELLING_WORDS, entryForWord } from './data/words.ts'
 import { wordsForDifficulty } from './study/difficulty.ts'
-import { finishTurn, startRound, type StudyQueue } from './study/queue.ts'
+import { finishTurn, startQueue, startRound, type StudyQueue } from './study/queue.ts'
+import { wordsForPage } from './data/pages.ts'
 import { containsTarget, maskSentence } from './study/sentenceClue.ts'
 import App from './App.tsx'
 
@@ -521,3 +522,62 @@ describe('saved study rounds', () => {
     expect(screen.getByText('Hi Ella, choose your adventure.')).toBeTruthy()
   })
 })
+
+describe('page a day', () => {
+  beforeEach(() => localStorage.clear())
+
+  const page1 = wordsForPage('page-1')
+
+  it('starts today on the next set of the first unfinished page', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('spellingBee.words', JSON.stringify({ learned: page1.slice(0, 10), practice: [] }))
+    render(<App />)
+
+    const today = screen.getByTestId('today-button')
+    expect(today.textContent).toMatch(/Today: Page 1/)
+    expect(today.textContent).toMatch(/Next: Words 11–20/)
+    expect(screen.getByTestId('percent-page-1').textContent).toBe('13%')
+    await user.click(today)
+    expect(screen.getByText('Page 1 · Words 11–20')).toBeTruthy()
+  })
+
+  it('finishes the page with the page test and moves today to the next page', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('spellingBee.words', JSON.stringify({ learned: page1, practice: [] }))
+    localStorage.setItem(
+      'spellingBee.session',
+      JSON.stringify({ kind: 'pageTest', label: 'Page 1 test', queue: startQueue(['ran']), stars: 0, pageId: 'page-1' }),
+    )
+    render(<App />)
+
+    expect(screen.getByTestId('today-button').textContent).toMatch(/Pick up where you left off/)
+    await user.click(screen.getByTestId('today-button'))
+    expect(screen.getByText(/0 of 1 try/)).toBeTruthy()
+    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), 'ran')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    await user.click(screen.getByRole('button', { name: /next word/i }))
+
+    expect(screen.getByTestId('page-test-score').textContent).toMatch(/Page 1 test: 1 \/ 1/)
+    expect(screen.getByTestId('page-test-score').textContent).toMatch(/Page 1 is done/)
+    await user.click(screen.getByRole('button', { name: /back to study choices/i }))
+    expect(screen.getByTestId('today-button').textContent).toMatch(/Today: Page 2/)
+  })
+
+  it('warms up once a day with missed words from earlier pages, then moves on', async () => {
+    const user = userEvent.setup()
+    localStorage.setItem('spellingBee.words', JSON.stringify({ learned: page1, practice: [page1[2]] }))
+    localStorage.setItem('spellingBee.pageTests', JSON.stringify({ 'page-1': { score: 75, total: 76 } }))
+    render(<App />)
+
+    expect(screen.getByTestId('today-button').textContent).toMatch(/Warm-up first/)
+    await user.click(screen.getByTestId('today-button'))
+    expect(screen.getByText('Warm-up from earlier pages')).toBeTruthy()
+    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), page1[2] ?? '')
+    await user.click(screen.getByRole('button', { name: /^submit$/i }))
+    await user.click(screen.getByRole('button', { name: /next word/i }))
+
+    await user.click(screen.getByRole('button', { name: /on to page 2/i }))
+    expect(screen.getByText('Page 2 · Words 1–10')).toBeTruthy()
+  })
+})
+
