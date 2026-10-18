@@ -14,7 +14,7 @@ import {
   type Seat,
 } from '../src/study/duel.ts'
 
-type FamilySocket = WebSocket & { seat: Seat | null }
+type FamilySocket = WebSocket & { seat: Seat | null; alive: boolean }
 
 const CONTENT: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -34,6 +34,7 @@ export function startDuelServer(options: {
   scoresPath: string
   distPath?: string
   host?: string
+  heartbeatMs?: number
 }) {
   mkdirSync(path.dirname(options.scoresPath), { recursive: true })
   const matchPath = path.join(path.dirname(options.scoresPath), 'match.json')
@@ -64,6 +65,10 @@ export function startDuelServer(options: {
   sockets.on('connection', (client) => {
     const socket = client as FamilySocket
     socket.seat = null
+    socket.alive = true
+    socket.on('pong', () => {
+      socket.alive = true
+    })
     socket.send(JSON.stringify({ type: 'state', view: viewFor(match, null) }))
 
     socket.on('message', (data) => {
@@ -87,6 +92,20 @@ export function startDuelServer(options: {
     })
   })
 
+  // A phone that went to sleep never sends "close", so its seat would hold up
+  // the match. Drop any socket that misses a ping; its close handler frees the seat.
+  const heartbeat = setInterval(() => {
+    for (const client of sockets.clients) {
+      const socket = client as FamilySocket
+      if (!socket.alive) {
+        socket.terminate()
+        continue
+      }
+      socket.alive = false
+      socket.ping()
+    }
+  }, options.heartbeatMs ?? 10_000)
+
   return new Promise<{ port: number; close: () => Promise<void> }>((resolve) => {
     httpServer.listen(options.port, options.host ?? '127.0.0.1', () => {
       const address = httpServer.address()
@@ -95,6 +114,7 @@ export function startDuelServer(options: {
         port,
         close: () =>
           new Promise((done) => {
+            clearInterval(heartbeat)
             for (const client of sockets.clients) client.terminate()
             sockets.close()
             httpServer.close(() => done())

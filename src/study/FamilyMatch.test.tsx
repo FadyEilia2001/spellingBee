@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { FamilyMatch, familyHomePageUrl, familyMatchLivesHere, type RoomConnection } from './FamilyMatch.tsx'
+import { connectFamilyRoom, FamilyMatch, familyHomePageUrl, familyMatchLivesHere, type RoomConnection } from './FamilyMatch.tsx'
 import { advance, emptyMatch, leave, sit, startMatch, submitGuess, viewFor, type ClientMessage, type DuelView } from './duel.ts'
 
 vi.mock('./soundtrack.ts', () => ({
@@ -30,6 +30,58 @@ function harness() {
   }
   return { sent, connect, show: (view: DuelView) => publish(view) }
 }
+
+describe('family room connection', () => {
+  it('reconnects after a drop and sits back in the same seat', () => {
+    vi.useFakeTimers()
+    const sockets: FakeSocket[] = []
+    class FakeSocket extends EventTarget {
+      static OPEN = 1
+      static CLOSING = 2
+      static CLOSED = 3
+      readyState = 0
+      sent: string[] = []
+      constructor() {
+        super()
+        sockets.push(this)
+      }
+      send(data: string) {
+        this.sent.push(data)
+      }
+      close() {
+        this.readyState = 3
+      }
+      open() {
+        this.readyState = 1
+        this.dispatchEvent(new Event('open'))
+      }
+      drop() {
+        this.readyState = 3
+        this.dispatchEvent(new Event('close'))
+      }
+    }
+    vi.stubGlobal('WebSocket', FakeSocket)
+    sessionStorage.clear()
+    const opens: boolean[] = []
+    const room = connectFamilyRoom(() => {}, (open) => opens.push(open), { rejoin: true })
+
+    sockets[0]!.open()
+    room.send({ type: 'sit', seat: 'Ella' })
+    sockets[0]!.drop()
+    expect(opens).toEqual([true, false])
+    vi.advanceTimersByTime(1000)
+    expect(sockets).toHaveLength(2)
+    sockets[1]!.open()
+    expect(sockets[1]!.sent).toEqual([JSON.stringify({ type: 'sit', seat: 'Ella' })])
+
+    room.close()
+    sockets[1]!.drop()
+    vi.advanceTimersByTime(20_000)
+    expect(sockets).toHaveLength(2)
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+})
 
 describe('family room address', () => {
   it('points phones at the home page when they are not already there', () => {
@@ -190,6 +242,8 @@ describe('family match screen', () => {
     expect(await screen.findByText('This game already started.')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Dad' })).toBeNull()
     await user.click(screen.getByRole('button', { name: 'Start over' }))
+    expect(room.sent.at(-1)).not.toEqual({ type: 'abandon' })
+    await user.click(screen.getByRole('button', { name: 'Yes, start over' }))
     expect(room.sent.at(-1)).toEqual({ type: 'abandon' })
 
     room.show(viewFor(leave(match, 'Mom'), null))
