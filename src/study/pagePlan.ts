@@ -4,7 +4,7 @@ import type { WordBook } from './learned.ts'
 export const PAGE_TESTS_STORAGE_KEY = 'spellingBee.pageTests'
 export const WARMUP_STORAGE_KEY = 'spellingBee.warmup'
 export const SET_SIZE = 10
-export const WARMUP_SIZE = 5
+export const WARMUP_SIZE = 8
 
 export type PageTests = Partial<Record<StudyPageId, { score: number; total: number }>>
 
@@ -56,7 +56,13 @@ export function warmupWords(book: WordBook, today: StudyPageId): string[] {
     wordsForPage(page.id),
   )
   const fromEarlier = new Set(earlier)
-  return book.practice.filter((word) => fromEarlier.has(word)).slice(0, WARMUP_SIZE)
+  const practice = book.practice.filter((word) => fromEarlier.has(word)).slice(0, 4)
+  const practiceSet = new Set(practice)
+  const learnedReview = book.learned
+    .filter((word) => fromEarlier.has(word) && !practiceSet.has(word))
+    .sort(() => Math.random() - 0.5)
+    .slice(0, WARMUP_SIZE - practice.length)
+  return [...practice, ...learnedReview]
 }
 
 export function loadPageTests(): PageTests {

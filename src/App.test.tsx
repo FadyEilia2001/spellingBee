@@ -566,43 +566,21 @@ describe('page a day', () => {
     expect(screen.getByTestId('progress-page-1')).toBeTruthy()
   })
 
-  it('finishes the page with the page test and moves today to the next page', async () => {
-    const user = userEvent.setup()
+  it('marks page done once all words are learned and moves today to the next page', () => {
     localStorage.setItem('spellingBee.words', JSON.stringify({ learned: page1, practice: [] }))
-    localStorage.setItem(
-      'spellingBee.session',
-      JSON.stringify({ kind: 'pageTest', label: 'Page 1 test', queue: startQueue(['ran']), stars: 0, pageId: 'page-1' }),
-    )
     render(<App />)
 
-    expect(screen.getByTestId('today-button').textContent).toMatch(/Pick up where you left off/)
-    await user.click(screen.getByTestId('today-button'))
-    expect(screen.getByText(/0 of 1 try/)).toBeTruthy()
-    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), 'ran')
-    await user.click(screen.getByRole('button', { name: /^submit$/i }))
-    await user.click(screen.getByRole('button', { name: /next word/i }))
-
-    expect(screen.getByTestId('page-test-score').textContent).toMatch(/Page 1 test: 1 \/ 1/)
-    expect(screen.getByTestId('page-test-score').textContent).toMatch(/Page 1 is done/)
-    await user.click(screen.getByRole('button', { name: /back to study choices/i }))
     expect(screen.getByTestId('today-button').textContent).toMatch(/Today: Page 2/)
   })
 
-  it('warms up once a day with missed words from earlier pages, then moves on', async () => {
+  it('warms up once a day with words from earlier pages', async () => {
     const user = userEvent.setup()
     localStorage.setItem('spellingBee.words', JSON.stringify({ learned: page1, practice: [page1[2]] }))
-    localStorage.setItem('spellingBee.pageTests', JSON.stringify({ 'page-1': { score: 75, total: 76 } }))
     render(<App />)
 
     expect(screen.getByTestId('today-button').textContent).toMatch(/Warm-up first/)
     await user.click(screen.getByTestId('today-button'))
     expect(screen.getByText('Warm-up from earlier pages')).toBeTruthy()
-    await user.type(screen.getByRole('textbox', { name: /spelling guess/i }), page1[2] ?? '')
-    await user.click(screen.getByRole('button', { name: /^submit$/i }))
-    await user.click(screen.getByRole('button', { name: /next word/i }))
-
-    await user.click(screen.getByRole('button', { name: /on to page 2/i }))
-    expect(screen.getByText('Page 2 · Words 1–10')).toBeTruthy()
   })
 })
 

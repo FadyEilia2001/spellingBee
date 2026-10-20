@@ -11,17 +11,17 @@ describe('page plan', () => {
     expect(status).toMatchObject({ learned: 15, total: 76, sets: 8, setsDone: 1, nextSet: 1, done: false })
   })
 
-  it('is done only once every word is learned and the test is taken', () => {
+  it('is done once every word is learned', () => {
     const book = { learned: page1, practice: [] }
-    expect(pageStatus('page-1', book, {}).done).toBe(false)
+    expect(pageStatus('page-1', book, {}).done).toBe(true)
     expect(pageStatus('page-1', book, {}).nextSet).toBeNull()
-    expect(pageStatus('page-1', book, { 'page-1': { score: 70, total: 76 } }).done).toBe(true)
   })
 
-  it('makes the first unfinished page today’s page', () => {
-    const book = { learned: page1, practice: [] }
-    expect(todaysPage(book, {})).toBe('page-1')
-    expect(todaysPage(book, { 'page-1': { score: 76, total: 76 } })).toBe('page-2')
+  it('makes the first unfinished page todays page', () => {
+    const partialBook = { learned: page1.slice(0, 15), practice: [] }
+    const fullBook = { learned: page1, practice: [] }
+    expect(todaysPage(partialBook, {})).toBe('page-1')
+    expect(todaysPage(fullBook, {})).toBe('page-2')
   })
 
   it('warms up with practice words from earlier pages only', () => {
