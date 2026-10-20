@@ -41,7 +41,7 @@ export function pageStatus(pageId: StudyPageId, book: WordBook, tests: PageTests
     setsDone: setDone.filter(Boolean).length,
     nextSet: nextSet === -1 ? null : nextSet,
     test,
-    done: learnedCount === words.length && test !== null,
+    done: learnedCount === words.length,
   }
 }
 

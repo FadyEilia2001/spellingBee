@@ -74,7 +74,7 @@ export function SpellingComparison({ guess, word }: { guess: string; word: strin
   )
 }
 
-export function NextButton({ onNext }: { onNext: () => void }) {
+export function NextButton({ onNext, autoAdvance = false }: { onNext: () => void; autoAdvance?: boolean }) {
   const ref = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     // Focused so Enter moves on once the keyboard has closed.
@@ -84,11 +84,14 @@ export function NextButton({ onNext }: { onNext: () => void }) {
     <button
       ref={ref}
       type="button"
-      className={`${touchTarget} mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 px-4 text-xl font-semibold text-[#1c1406] transition hover:bg-amber-300`}
+      className={`${touchTarget} relative mt-6 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-amber-400 px-4 text-xl font-semibold text-[#1c1406] transition hover:bg-amber-300`}
       onClick={onNext}
     >
       Next Word
       <ChevronRight aria-hidden="true" />
+      {autoAdvance && (
+        <span className="drain-bar absolute bottom-0 left-0 h-1 bg-amber-600" aria-hidden="true" />
+      )}
     </button>
   )
 }

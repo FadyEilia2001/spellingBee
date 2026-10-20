@@ -63,6 +63,12 @@ export function StudyTurn({
     }
   }, [word])
 
+  useEffect(() => {
+    if (!solved) return
+    const timer = window.setTimeout(onNext, 1500)
+    return () => window.clearTimeout(timer)
+  }, [solved, onNext])
+
   function submitGuess(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const guess = draft.trim()
@@ -224,7 +230,7 @@ export function StudyTurn({
         </button>
       </div>
 
-      {locked ? <NextButton onNext={onNext} /> : null}
+      {locked ? <NextButton onNext={onNext} autoAdvance={solved} /> : null}
     </>
   )
 }
