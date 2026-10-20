@@ -79,7 +79,11 @@ export function peakAmplitude(buffer: AudioBuffer): number {
   return peak;
 }
 
+const healthCache = new Map<string, AudioHealth>();
+
 export async function checkSpellingAudio(url: string): Promise<AudioHealth> {
+  const cached = healthCache.get(url);
+  if (cached) return cached;
   try {
     const response = await fetch(url);
     if (!response.ok) return "unusable";
@@ -87,7 +91,9 @@ export async function checkSpellingAudio(url: string): Promise<AudioHealth> {
     const context = new AudioContext();
     try {
       const decoded = await context.decodeAudioData(bytes.slice(0));
-      return peakAmplitude(decoded) >= MIN_AUDIO_PEAK ? "ok" : "unusable";
+      const health = peakAmplitude(decoded) >= MIN_AUDIO_PEAK ? "ok" : "unusable";
+      healthCache.set(url, health);
+      return health;
     } finally {
       void context.close();
     }
